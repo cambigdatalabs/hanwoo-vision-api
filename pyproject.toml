@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hanwoo-vision-api"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.30.0",
+  "python-multipart>=0.0.9",
+  "pydantic>=2.7.0",
+  "torch",
+  "torchvision",
+  "transformers==4.49.0",
+  "accelerate>=0.27.0",
+  "Pillow>=10.0.0",
+  "numpy>=1.26.0",
+  "opencv-python-headless>=4.6.0",
+  "onnxruntime-gpu>=1.23.2",
+  "pymatting>=1.1.14",
+  "pooch>=1.8.2",
+  "qdrant-client>=1.10.0",
+  "rembg>=2.0.67",
+  "jsonschema>=4.25.1",
+  "scikit-image>=0.19.3",
+  "scipy>=1.4.1",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,29 @@
+services:
+  matching:
+    build: .
+    command: uvicorn hanwoo.services.matching.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    environment:
+      HANWOO_DEVICE: auto
+      MATCHING_MODEL_PATH: /app/models/matching/encoder.pt
+      HANWOO_STORAGE_DIR: /app/storage/matching
+      U2NET_HOME: /app/models/u2net
+      DEFAULT_TOP_K: 5
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION: hanwoo_matching_gallery
+    volumes:
+      - ./models:/app/models:ro
+      - ./storage:/app/storage
+    depends_on:
+      - qdrant
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+volumes:
+  qdrant_data:

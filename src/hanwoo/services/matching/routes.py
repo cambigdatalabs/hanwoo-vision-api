@@ -1,0 +1,139 @@
+from __future__ import annotations
+
+import io
+from pathlib import Path
+from typing import Annotated
+
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from PIL import Image
+
+from hanwoo.core.config import DEFAULT_TOP_K, MATCHING_MODEL_PATH, STORAGE_DIR
+from hanwoo.core.preprocessing import preprocess_for_matching
+from hanwoo.core.schemas import DirectoryImportRequest
+from hanwoo.services.matching.pipeline import MatchingService
+
+
+router = APIRouter()
+matching_service: MatchingService | None = None
+
+
+def set_matching_service(service: MatchingService) -> None:
+    global matching_service
+    matching_service = service
+
+
+def get_matching_service() -> MatchingService:
+    if matching_service is None:
+        raise RuntimeError("Matching service is not initialized")
+    return matching_service
+
+
+async def read_image(file: UploadFile) -> Image.Image:
+    content = await file.read()
+    try:
+        return Image.open(io.BytesIO(content)).convert("RGB")
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid image: {exc}") from exc
+
+
+@router.get("/health")
+def health():
+    service = get_matching_service()
+    return {
+        "status": "healthy",
+        "model_loaded": service.model is not None,
+        "device": str(service.device),
+        "storage_dir": str(STORAGE_DIR),
+    }
+
+
+@router.get("/metadata")
+def metadata():
+    service = get_matching_service()
+    return {
+        "checkpoint_path": str(MATCHING_MODEL_PATH),
+        "architecture": "SiameseViT",
+        **service.checkpoint_metadata,
+    }
+
+
+@router.get("/gallery/images")
+def list_gallery():
+    return get_matching_service().list_gallery()
+
+
+@router.post("/gallery/images")
+async def add_gallery_images(
+    files: Annotated[list[UploadFile], File()],
+    preprocess: Annotated[
+        bool,
+        Form(description="Apply background removal, tilt correction, and crop."),
+    ] = True,
+):
+    service = get_matching_service()
+    added = []
+    for file in files:
+        image = await read_image(file)
+        if preprocess:
+            image = preprocess_for_matching(image)
+        added.append(service.add_gallery_image(file.filename, image, preprocess))
+    return {"added": added, "count": len(added)}
+
+
+@router.post("/gallery/import-directory")
+def import_gallery_directory(request: DirectoryImportRequest):
+    service = get_matching_service()
+    directory = Path(request.directory)
+    if not directory.exists() or not directory.is_dir():
+        raise HTTPException(status_code=400, detail=f"Directory not found: {directory}")
+
+    added = []
+    skipped = []
+    for path in sorted(directory.iterdir()):
+        if not path.is_file():
+            continue
+        try:
+            image = Image.open(path).convert("RGB")
+            if request.preprocess:
+                image = preprocess_for_matching(image)
+            added.append(service.add_gallery_image(path.name, image, request.preprocess))
+        except Exception as exc:
+            skipped.append({"path": str(path), "error": str(exc)})
+    return {"added": added, "skipped": skipped}
+
+
+@router.delete("/gallery/images/{name}")
+def remove_gallery_image(name: str):
+    removed = get_matching_service().remove_gallery_image(name)
+    if not removed:
+        raise HTTPException(status_code=404, detail=f"Gallery image not found: {name}")
+    return {"removed": name}
+
+
+@router.delete("/gallery/images")
+def clear_gallery():
+    removed_count = get_matching_service().clear_gallery()
+    return {"removed_count": removed_count}
+
+
+@router.post("/match")
+async def match_image(
+    file: Annotated[UploadFile, File()],
+    top_k: Annotated[int, Query(ge=1, le=50)] = DEFAULT_TOP_K,
+    preprocess: Annotated[
+        bool,
+        Query(description="Apply background removal, tilt correction, and crop."),
+    ] = False,
+):
+    image = await read_image(file)
+    if preprocess:
+        image = preprocess_for_matching(image)
+    matches = get_matching_service().find_matches(image, top_k=top_k)
+    if not matches:
+        raise HTTPException(status_code=404, detail="Gallery is empty")
+    return {
+        "query_file": file.filename,
+        "top_k": min(top_k, len(matches)),
+        "preprocess": preprocess,
+        "matches": matches,
+    }

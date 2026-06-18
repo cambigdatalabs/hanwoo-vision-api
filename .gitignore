@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+
+.env
+.venv/
+venv/
+
+storage/
+
+models/**/*.pt
+models/**/*.pth
+models/**/*.onnx
+models/**/*.faiss
+models/**/threshold.json
+
+.DS_Store
