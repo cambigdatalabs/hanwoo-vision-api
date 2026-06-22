@@ -13,6 +13,8 @@ from qdrant_client.http import models
 @dataclass(frozen=True)
 class GalleryPoint:
     name: str
+    lot_id: str
+    capture_date: str
     variant: str
     distance: float
     image_path: str
@@ -55,28 +57,98 @@ class QdrantGalleryStore:
             ),
         )
 
+    @staticmethod
+    def _filter(
+        *,
+        lot_id: str | None = None,
+        capture_date: str | None = None,
+        name: str | None = None,
+        variant: str | None = None,
+    ) -> models.Filter | None:
+        conditions = []
+        for key, value in (
+            ("lot_id", lot_id),
+            ("capture_date", capture_date),
+            ("name", name),
+            ("variant", variant),
+        ):
+            if value is not None:
+                conditions.append(
+                    models.FieldCondition(
+                        key=key,
+                        match=models.MatchValue(value=value),
+                    )
+                )
+        if not conditions:
+            return None
+        return models.Filter(must=conditions)
+
     def list_names(self) -> list[str]:
-        names: set[str] = set()
+        return [image["name"] for image in self.list_images()]
+
+    def list_images(
+        self,
+        *,
+        lot_id: str | None = None,
+        capture_date: str | None = None,
+    ) -> list[dict]:
+        seen: set[tuple[str | None, str | None, str]] = set()
+        images = []
         offset = None
+        scroll_filter = self._filter(
+            lot_id=lot_id,
+            capture_date=capture_date,
+            variant="original",
+        )
         while True:
             points, offset = self.client.scroll(
                 collection_name=self.collection,
+                scroll_filter=scroll_filter,
                 limit=256,
                 offset=offset,
                 with_payload=True,
                 with_vectors=False,
             )
             for point in points:
-                if point.payload and point.payload.get("variant") == "original":
-                    names.add(str(point.payload["name"]))
+                if not point.payload:
+                    continue
+                name = str(point.payload["name"])
+                key = (
+                    point.payload.get("lot_id"),
+                    point.payload.get("capture_date"),
+                    name,
+                )
+                if key in seen:
+                    continue
+                seen.add(key)
+                images.append(
+                    {
+                        "name": name,
+                        "lot_id": point.payload.get("lot_id"),
+                        "capture_date": point.payload.get("capture_date"),
+                        "image_path": point.payload.get("image_path"),
+                        "original_filename": point.payload.get("original_filename"),
+                        "preprocessed": point.payload.get("preprocessed"),
+                        "created_at": point.payload.get("created_at"),
+                    }
+                )
             if offset is None:
                 break
-        return sorted(names)
+        return sorted(
+            images,
+            key=lambda item: (
+                str(item.get("lot_id") or ""),
+                str(item.get("capture_date") or ""),
+                str(item["name"]),
+            ),
+        )
 
     def upsert_image(
         self,
         *,
         name: str,
+        lot_id: str,
+        capture_date: str,
         image_path: Path,
         original_filename: str,
         original_vector: Iterable[float],
@@ -89,13 +161,20 @@ class QdrantGalleryStore:
             ("original", original_vector),
             ("rotated", rotated_vector),
         ):
-            point_id = str(uuid5(NAMESPACE_URL, f"{self.collection}:{name}:{variant}"))
+            point_id = str(
+                uuid5(
+                    NAMESPACE_URL,
+                    f"{self.collection}:{lot_id}:{capture_date}:{name}:{variant}",
+                )
+            )
             points.append(
                 models.PointStruct(
                     id=point_id,
                     vector=list(vector),
                     payload={
                         "name": name,
+                        "lot_id": lot_id,
+                        "capture_date": capture_date,
                         "variant": variant,
                         "image_path": str(image_path),
                         "original_filename": original_filename,
@@ -106,10 +185,18 @@ class QdrantGalleryStore:
             )
         self.client.upsert(collection_name=self.collection, points=points)
 
-    def search(self, vector: Iterable[float], limit: int) -> list[GalleryPoint]:
+    def search(
+        self,
+        vector: Iterable[float],
+        limit: int,
+        *,
+        lot_id: str,
+        capture_date: str | None = None,
+    ) -> list[GalleryPoint]:
         response = self.client.query_points(
             collection_name=self.collection,
             query=list(vector),
+            query_filter=self._filter(lot_id=lot_id, capture_date=capture_date),
             limit=limit,
             with_payload=True,
         )
@@ -119,6 +206,8 @@ class QdrantGalleryStore:
             points.append(
                 GalleryPoint(
                     name=str(payload["name"]),
+                    lot_id=str(payload["lot_id"]),
+                    capture_date=str(payload["capture_date"]),
                     variant=str(payload["variant"]),
                     distance=float(result.score),
                     image_path=str(payload.get("image_path", "")),
@@ -128,21 +217,33 @@ class QdrantGalleryStore:
             )
         return points
 
-    def remove_image(self, name: str) -> None:
+    def remove_image(
+        self,
+        name: str,
+        *,
+        lot_id: str,
+        capture_date: str | None = None,
+    ) -> None:
         self.client.delete(
             collection_name=self.collection,
             points_selector=models.FilterSelector(
-                filter=models.Filter(
-                    must=[
-                        models.FieldCondition(
-                            key="name",
-                            match=models.MatchValue(value=name),
-                        )
-                    ]
+                filter=self._filter(
+                    lot_id=lot_id,
+                    capture_date=capture_date,
+                    name=name,
                 )
             ),
         )
 
-    def clear(self) -> None:
-        self.client.delete_collection(collection_name=self.collection)
-        self.ensure_collection()
+    def clear(
+        self,
+        *,
+        lot_id: str,
+        capture_date: str | None = None,
+    ) -> None:
+        self.client.delete(
+            collection_name=self.collection,
+            points_selector=models.FilterSelector(
+                filter=self._filter(lot_id=lot_id, capture_date=capture_date)
+            ),
+        )

@@ -58,17 +58,31 @@ def metadata():
 
 
 @router.get("/gallery/images")
-def list_gallery():
-    return get_matching_service().list_gallery()
+def list_gallery(
+    lot_id: Annotated[str | None, Query()] = None,
+    capture_date: Annotated[str | None, Query()] = None,
+):
+    try:
+        return get_matching_service().list_gallery(
+            lot_id=lot_id,
+            capture_date=capture_date,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.post("/gallery/images")
 async def add_gallery_images(
     files: Annotated[list[UploadFile], File()],
+    lot_id: Annotated[str, Form(description="Lot identifier used to scope matching.")],
     preprocess: Annotated[
         bool,
         Form(description="Apply background removal, tilt correction, and crop."),
     ] = True,
+    capture_date: Annotated[
+        str | None,
+        Form(description="Capture date in YYYY-MM-DD. Defaults to server date."),
+    ] = None,
 ):
     service = get_matching_service()
     added = []
@@ -76,7 +90,18 @@ async def add_gallery_images(
         image = await read_image(file)
         if preprocess:
             image = preprocess_for_matching(image)
-        added.append(service.add_gallery_image(file.filename, image, preprocess))
+        try:
+            added.append(
+                service.add_gallery_image(
+                    file.filename,
+                    image,
+                    lot_id=lot_id,
+                    capture_date=capture_date,
+                    preprocessed=preprocess,
+                )
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {"added": added, "count": len(added)}
 
 
@@ -96,43 +121,83 @@ def import_gallery_directory(request: DirectoryImportRequest):
             image = Image.open(path).convert("RGB")
             if request.preprocess:
                 image = preprocess_for_matching(image)
-            added.append(service.add_gallery_image(path.name, image, request.preprocess))
+            added.append(
+                service.add_gallery_image(
+                    path.name,
+                    image,
+                    lot_id=request.lot_id,
+                    capture_date=request.capture_date,
+                    preprocessed=request.preprocess,
+                )
+            )
         except Exception as exc:
             skipped.append({"path": str(path), "error": str(exc)})
     return {"added": added, "skipped": skipped}
 
 
 @router.delete("/gallery/images/{name}")
-def remove_gallery_image(name: str):
-    removed = get_matching_service().remove_gallery_image(name)
+def remove_gallery_image(
+    name: str,
+    lot_id: Annotated[str, Query(description="Lot identifier used to scope deletion.")],
+    capture_date: Annotated[str | None, Query()] = None,
+):
+    try:
+        removed = get_matching_service().remove_gallery_image(
+            name,
+            lot_id=lot_id,
+            capture_date=capture_date,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     if not removed:
         raise HTTPException(status_code=404, detail=f"Gallery image not found: {name}")
-    return {"removed": name}
+    return {"removed": name, "lot_id": lot_id, "capture_date": capture_date}
 
 
 @router.delete("/gallery/images")
-def clear_gallery():
-    removed_count = get_matching_service().clear_gallery()
-    return {"removed_count": removed_count}
+def clear_gallery(
+    lot_id: Annotated[str, Query(description="Lot identifier used to scope deletion.")],
+    capture_date: Annotated[str | None, Query()] = None,
+):
+    try:
+        removed_count = get_matching_service().clear_gallery(
+            lot_id=lot_id,
+            capture_date=capture_date,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"removed_count": removed_count, "lot_id": lot_id, "capture_date": capture_date}
 
 
 @router.post("/match")
 async def match_image(
     file: Annotated[UploadFile, File()],
+    lot_id: Annotated[str, Query(description="Lot identifier used to scope matching.")],
     top_k: Annotated[int, Query(ge=1, le=50)] = DEFAULT_TOP_K,
     preprocess: Annotated[
         bool,
         Query(description="Apply background removal, tilt correction, and crop."),
     ] = False,
+    capture_date: Annotated[str | None, Query()] = None,
 ):
     image = await read_image(file)
     if preprocess:
         image = preprocess_for_matching(image)
-    matches = get_matching_service().find_matches(image, top_k=top_k)
+    try:
+        matches = get_matching_service().find_matches(
+            image,
+            top_k=top_k,
+            lot_id=lot_id,
+            capture_date=capture_date,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     if not matches:
-        raise HTTPException(status_code=404, detail="Gallery is empty")
+        raise HTTPException(status_code=404, detail="Gallery scope is empty")
     return {
         "query_file": file.filename,
+        "lot_id": lot_id,
+        "capture_date": capture_date,
         "top_k": min(top_k, len(matches)),
         "preprocess": preprocess,
         "matches": matches,

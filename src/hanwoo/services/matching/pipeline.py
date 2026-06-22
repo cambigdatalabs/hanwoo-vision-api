@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 from threading import RLock
 
@@ -127,6 +128,18 @@ class MatchingService:
                 allowed.append(ch)
         return "".join(allowed) or "image"
 
+    @classmethod
+    def safe_lot_id(cls, lot_id: str) -> str:
+        if not lot_id.strip():
+            raise ValueError("lot_id is required")
+        return cls.safe_stem(lot_id)
+
+    @staticmethod
+    def normalize_capture_date(capture_date: str | None) -> str:
+        if capture_date is None or not capture_date.strip():
+            return date.today().isoformat()
+        return date.fromisoformat(capture_date.strip()).isoformat()
+
     def embed_image(self, img: Image.Image) -> torch.Tensor:
         model = self._ensure_loaded()
         img_tensor = self.transform(img.convert("RGB")).unsqueeze(0).to(self.device)
@@ -141,11 +154,21 @@ class MatchingService:
         self,
         name: str,
         image: Image.Image,
+        lot_id: str,
+        capture_date: str | None = None,
         preprocessed: bool | None = None,
     ) -> dict:
         with self.lock:
             store = self._ensure_store()
-            existing = set(store.list_names())
+            lot_id = self.safe_lot_id(lot_id)
+            capture_date = self.normalize_capture_date(capture_date)
+            existing = {
+                item["name"]
+                for item in store.list_images(
+                    lot_id=lot_id,
+                    capture_date=capture_date,
+                )
+            }
             base_name = self.safe_stem(name)
             final_name = base_name
             counter = 2
@@ -153,13 +176,17 @@ class MatchingService:
                 final_name = f"{base_name}_{counter}"
                 counter += 1
 
-            save_path = self.gallery_dir / f"{final_name}.png"
+            save_dir = self.gallery_dir / lot_id / capture_date
+            save_dir.mkdir(parents=True, exist_ok=True)
+            save_path = save_dir / f"{final_name}.png"
             image = image.convert("RGB")
             image.save(save_path)
 
             emb_orig, emb_rot = self.embed_image_dual(image)
             store.upsert_image(
                 name=final_name,
+                lot_id=lot_id,
+                capture_date=capture_date,
                 image_path=save_path,
                 original_filename=name,
                 original_vector=emb_orig.tolist(),
@@ -167,54 +194,115 @@ class MatchingService:
                 preprocessed=preprocessed,
             )
 
-        return {"name": final_name, "path": str(save_path)}
+        return {
+            "name": final_name,
+            "lot_id": lot_id,
+            "capture_date": capture_date,
+            "path": str(save_path),
+        }
 
-    def remove_gallery_image(self, name: str) -> bool:
+    def remove_gallery_image(
+        self,
+        name: str,
+        lot_id: str,
+        capture_date: str | None = None,
+    ) -> bool:
         with self.lock:
             store = self._ensure_store()
-            if name not in set(store.list_names()):
+            lot_id = self.safe_lot_id(lot_id)
+            capture_date = self.normalize_capture_date(capture_date) if capture_date else None
+            images = store.list_images(lot_id=lot_id, capture_date=capture_date)
+            if name not in {item["name"] for item in images}:
                 return False
 
-            store.remove_image(name)
+            store.remove_image(name, lot_id=lot_id, capture_date=capture_date)
 
-            for ext in IMAGE_EXTENSIONS:
-                path = self.gallery_dir / f"{name}{ext}"
-                if path.exists():
-                    path.unlink()
+            for item in images:
+                if item["name"] != name:
+                    continue
+                image_path = item.get("image_path")
+                if image_path:
+                    path = Path(str(image_path))
+                    if path.exists():
+                        path.unlink()
         return True
 
-    def clear_gallery(self) -> int:
+    def clear_gallery(self, lot_id: str, capture_date: str | None = None) -> int:
         with self.lock:
             store = self._ensure_store()
-            count = len(store.list_names())
-            store.clear()
-            for path in self.gallery_dir.iterdir():
-                if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS:
-                    path.unlink()
+            lot_id = self.safe_lot_id(lot_id)
+            capture_date = self.normalize_capture_date(capture_date) if capture_date else None
+            images = store.list_images(lot_id=lot_id, capture_date=capture_date)
+            count = len(images)
+            store.clear(lot_id=lot_id, capture_date=capture_date)
+            for item in images:
+                image_path = item.get("image_path")
+                if image_path:
+                    path = Path(str(image_path))
+                    if path.exists():
+                        path.unlink()
+
+            root = self.gallery_dir / lot_id
+            if capture_date:
+                root = root / capture_date
+            if root.exists():
+                for path in sorted(root.rglob("*"), key=lambda item: len(item.parts), reverse=True):
+                    if path.is_dir() and not any(path.iterdir()):
+                        path.rmdir()
+                if root.is_dir() and not any(root.iterdir()):
+                    root.rmdir()
+            lot_root = self.gallery_dir / lot_id
+            if lot_root.exists() and lot_root.is_dir() and not any(lot_root.iterdir()):
+                lot_root.rmdir()
         return count
 
-    def list_gallery(self) -> dict:
+    def list_gallery(
+        self,
+        lot_id: str | None = None,
+        capture_date: str | None = None,
+    ) -> dict:
         with self.lock:
-            names = self._ensure_store().list_names()
+            if lot_id is not None:
+                lot_id = self.safe_lot_id(lot_id)
+            capture_date = self.normalize_capture_date(capture_date) if capture_date else None
+            images = self._ensure_store().list_images(
+                lot_id=lot_id,
+                capture_date=capture_date,
+            )
             return {
-                "count": len(names),
-                "filenames": names,
+                "count": len(images),
+                "filenames": [image["name"] for image in images],
+                "images": images,
             }
 
-    def find_matches(self, query_img: Image.Image, top_k: int) -> list[dict]:
+    def find_matches(
+        self,
+        query_img: Image.Image,
+        top_k: int,
+        lot_id: str,
+        capture_date: str | None = None,
+    ) -> list[dict]:
         query_emb = self.embed_image(query_img)
         with self.lock:
             store = self._ensure_store()
-            names = store.list_names()
-            if not names:
+            lot_id = self.safe_lot_id(lot_id)
+            capture_date = self.normalize_capture_date(capture_date) if capture_date else None
+            images = store.list_images(lot_id=lot_id, capture_date=capture_date)
+            if not images:
                 return []
-            candidates = store.search(query_emb.tolist(), limit=min(len(names) * 2, top_k * 8))
+            candidates = store.search(
+                query_emb.tolist(),
+                limit=min(len(images) * 2, top_k * 8),
+                lot_id=lot_id,
+                capture_date=capture_date,
+            )
 
         best_by_name = {}
         for point in candidates:
-            current = best_by_name.get(point.name)
+            key = (point.lot_id, point.capture_date, point.name)
+            current = best_by_name.get(key)
             if current is None or point.distance < current.distance:
-                best_by_name[point.name] = point
+                best_by_name[key] = point
 
         results = []
         for rank, point in enumerate(
@@ -226,9 +314,12 @@ class MatchingService:
                 {
                     "rank": rank,
                     "name": point.name,
+                    "lot_id": point.lot_id,
+                    "capture_date": point.capture_date,
                     "distance": point.distance,
                     "similarity": float(similarity),
-                    "image_path": point.image_path or str(self.gallery_dir / f"{point.name}.png"),
+                    "image_path": point.image_path
+                    or str(self.gallery_dir / point.lot_id / point.capture_date / f"{point.name}.png"),
                     "matched_variant": point.variant,
                 }
             )
