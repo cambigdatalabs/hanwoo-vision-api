@@ -18,6 +18,7 @@ Full endpoint reference with parameter tables and curl examples:
 - GPU runtime is supported through Docker Compose GPU override.
 - `HANWOO_DEVICE=auto` uses CUDA when available and falls back to CPU when CUDA
   is not detected.
+- API endpoints require `X-API-Key` authentication except health/docs routes.
 
 ## Architecture
 
@@ -118,6 +119,7 @@ Environment variables:
 | `HANWOO_STORAGE_DIR` | `/app/storage/matching` | Runtime storage directory. |
 | `U2NET_HOME` | `/app/models/u2net` | Background removal model directory. |
 | `DEFAULT_TOP_K` | `5` | Default match result count. |
+| `HANWOO_API_KEY` | required | Shared API key required in the `X-API-Key` header. |
 | `QDRANT_URL` | `http://qdrant:6333` | Qdrant service URL. |
 | `QDRANT_COLLECTION` | `hanwoo_matching_gallery` | Qdrant collection name. |
 | `ANOMALY_MODEL_PATH` | `/app/models/anomaly/memory_bank.pth` | Anomaly memory bank path. |
@@ -222,6 +224,13 @@ Current verified GPU health responses:
 }
 ```
 
+Protected endpoints require the configured API key:
+
+```bash
+export HANWOO_API_KEY="change-me"
+curl -H "X-API-Key: $HANWOO_API_KEY" "http://localhost:8888/metadata"
+```
+
 If no GPU is available and `HANWOO_DEVICE=auto`, the service runs on CPU:
 
 ```json
@@ -280,6 +289,7 @@ Upload one image:
 
 ```bash
 curl -X POST "http://localhost:8888/gallery/images" \
+  -H "X-API-Key: $HANWOO_API_KEY" \
   -F "lot_id=LOT-001" \
   -F "capture_date=2026-06-22" \
   -F "preprocess=true" \
@@ -290,6 +300,7 @@ Upload multiple images:
 
 ```bash
 curl -X POST "http://localhost:8888/gallery/images" \
+  -H "X-API-Key: $HANWOO_API_KEY" \
   -F "lot_id=LOT-001" \
   -F "capture_date=2026-06-22" \
   -F "files=@image_1.jpg" \
@@ -299,19 +310,20 @@ curl -X POST "http://localhost:8888/gallery/images" \
 List one lot:
 
 ```bash
-curl "http://localhost:8888/gallery/images?lot_id=LOT-001"
+curl -H "X-API-Key: $HANWOO_API_KEY" "http://localhost:8888/gallery/images?lot_id=LOT-001"
 ```
 
 List one lot/date:
 
 ```bash
-curl "http://localhost:8888/gallery/images?lot_id=LOT-001&capture_date=2026-06-22"
+curl -H "X-API-Key: $HANWOO_API_KEY" "http://localhost:8888/gallery/images?lot_id=LOT-001&capture_date=2026-06-22"
 ```
 
 Match a query image against one lot:
 
 ```bash
 curl -X POST "http://localhost:8888/match?lot_id=LOT-001&top_k=5" \
+  -H "X-API-Key: $HANWOO_API_KEY" \
   -F "file=@after_packaging.jpg"
 ```
 
@@ -319,19 +331,22 @@ Match a query image against one lot/date:
 
 ```bash
 curl -X POST "http://localhost:8888/match?lot_id=LOT-001&capture_date=2026-06-22&top_k=5" \
+  -H "X-API-Key: $HANWOO_API_KEY" \
   -F "file=@after_packaging.jpg"
 ```
 
 Delete one image from one lot:
 
 ```bash
-curl -X DELETE "http://localhost:8888/gallery/images/before_packaging?lot_id=LOT-001"
+curl -X DELETE "http://localhost:8888/gallery/images/before_packaging?lot_id=LOT-001" \
+  -H "X-API-Key: $HANWOO_API_KEY"
 ```
 
 Clear one lot/date:
 
 ```bash
-curl -X DELETE "http://localhost:8888/gallery/images?lot_id=LOT-001&capture_date=2026-06-22"
+curl -X DELETE "http://localhost:8888/gallery/images?lot_id=LOT-001&capture_date=2026-06-22" \
+  -H "X-API-Key: $HANWOO_API_KEY"
 ```
 
 More examples and response bodies are in [API_ENDPOINTS.md](API_ENDPOINTS.md).
@@ -509,6 +524,7 @@ GPU 사용 중이면 응답에 `"device": "cuda"`가 포함됩니다.
 | `HANWOO_STORAGE_DIR` | `/app/storage/matching` | 런타임 저장소 경로입니다. |
 | `U2NET_HOME` | `/app/models/u2net` | 배경 제거 모델 경로입니다. |
 | `DEFAULT_TOP_K` | `5` | 기본 매칭 결과 개수입니다. |
+| `HANWOO_API_KEY` | 필수 | `X-API-Key` 헤더로 전달할 공유 API 키입니다. |
 | `QDRANT_URL` | `http://qdrant:6333` | Qdrant 접속 URL입니다. |
 | `QDRANT_COLLECTION` | `hanwoo_matching_gallery` | Qdrant 컬렉션 이름입니다. |
 

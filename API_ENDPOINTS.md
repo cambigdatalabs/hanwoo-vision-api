@@ -17,6 +17,16 @@ Current implemented services:
 - Matching gallery enrollment/query on host port `8888`.
 - Anomaly detection inference on host port `8889`.
 
+## Authentication
+
+All endpoints except `/health`, `/docs`, `/redoc`, and `/openapi.json` require
+an API key:
+
+```bash
+export HANWOO_API_KEY="change-me"
+curl -H "X-API-Key: $HANWOO_API_KEY" "http://localhost:8888/metadata"
+```
+
 Gallery data is scoped by `lot_id`. Images are stored under
 `storage/matching/gallery_images/{lot_id}/{capture_date}`. Embeddings and
 metadata are stored in Qdrant collection `hanwoo_matching_gallery`.
@@ -66,7 +76,7 @@ None.
 ### Example
 
 ```bash
-curl "http://localhost:8888/metadata"
+curl -H "X-API-Key: $HANWOO_API_KEY" "http://localhost:8888/metadata"
 ```
 
 ### Response Example
@@ -99,19 +109,19 @@ Lists enrolled gallery images. Can list all images or filter by lot/date.
 List all gallery images:
 
 ```bash
-curl "http://localhost:8888/gallery/images"
+curl -H "X-API-Key: $HANWOO_API_KEY" "http://localhost:8888/gallery/images"
 ```
 
 List one lot:
 
 ```bash
-curl "http://localhost:8888/gallery/images?lot_id=LOT-001"
+curl -H "X-API-Key: $HANWOO_API_KEY" "http://localhost:8888/gallery/images?lot_id=LOT-001"
 ```
 
 List one lot and date:
 
 ```bash
-curl "http://localhost:8888/gallery/images?lot_id=LOT-001&capture_date=2026-06-22"
+curl -H "X-API-Key: $HANWOO_API_KEY" "http://localhost:8888/gallery/images?lot_id=LOT-001&capture_date=2026-06-22"
 ```
 
 ### Response Example
@@ -154,6 +164,7 @@ Multipart form-data.
 
 ```bash
 curl -X POST "http://localhost:8888/gallery/images" \
+  -H "X-API-Key: $HANWOO_API_KEY" \
   -F "lot_id=LOT-001" \
   -F "capture_date=2026-06-22" \
   -F "preprocess=false" \
@@ -164,6 +175,7 @@ Multiple files:
 
 ```bash
 curl -X POST "http://localhost:8888/gallery/images" \
+  -H "X-API-Key: $HANWOO_API_KEY" \
   -F "lot_id=LOT-001" \
   -F "capture_date=2026-06-22" \
   -F "preprocess=true" \
@@ -208,6 +220,7 @@ JSON body.
 
 ```bash
 curl -X POST "http://localhost:8888/gallery/import-directory" \
+  -H "X-API-Key: $HANWOO_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "directory": "/app/data/lot_001",
@@ -251,13 +264,15 @@ matching `name` entries across all dates in that lot.
 Delete from a lot:
 
 ```bash
-curl -X DELETE "http://localhost:8888/gallery/images/before_packaging?lot_id=LOT-001"
+curl -X DELETE "http://localhost:8888/gallery/images/before_packaging?lot_id=LOT-001" \
+  -H "X-API-Key: $HANWOO_API_KEY"
 ```
 
 Delete from a lot/date:
 
 ```bash
-curl -X DELETE "http://localhost:8888/gallery/images/before_packaging?lot_id=LOT-001&capture_date=2026-06-22"
+curl -X DELETE "http://localhost:8888/gallery/images/before_packaging?lot_id=LOT-001&capture_date=2026-06-22" \
+  -H "X-API-Key: $HANWOO_API_KEY"
 ```
 
 ### Response Example
@@ -287,13 +302,15 @@ only that date is cleared; otherwise the whole lot is cleared.
 Clear one lot:
 
 ```bash
-curl -X DELETE "http://localhost:8888/gallery/images?lot_id=LOT-001"
+curl -X DELETE "http://localhost:8888/gallery/images?lot_id=LOT-001" \
+  -H "X-API-Key: $HANWOO_API_KEY"
 ```
 
 Clear one date in one lot:
 
 ```bash
-curl -X DELETE "http://localhost:8888/gallery/images?lot_id=LOT-001&capture_date=2026-06-22"
+curl -X DELETE "http://localhost:8888/gallery/images?lot_id=LOT-001&capture_date=2026-06-22" \
+  -H "X-API-Key: $HANWOO_API_KEY"
 ```
 
 ### Response Example
@@ -329,6 +346,7 @@ Match against one lot:
 
 ```bash
 curl -X POST "http://localhost:8888/match?lot_id=LOT-001&top_k=5&preprocess=false" \
+  -H "X-API-Key: $HANWOO_API_KEY" \
   -F "file=@after_packaging.jpg"
 ```
 
@@ -336,6 +354,7 @@ Match against one lot/date:
 
 ```bash
 curl -X POST "http://localhost:8888/match?lot_id=LOT-001&capture_date=2026-06-22&top_k=5&preprocess=false" \
+  -H "X-API-Key: $HANWOO_API_KEY" \
   -F "file=@after_packaging.jpg"
 ```
 
@@ -451,6 +470,7 @@ Multipart form-data plus query params.
 
 ```bash
 curl -X POST "http://localhost:8889/infer?preprocess=true" \
+  -H "X-API-Key: $HANWOO_API_KEY" \
   -F "file=@sample.jpg"
 ```
 
@@ -478,7 +498,7 @@ Returns the active anomaly threshold.
 ### Example
 
 ```bash
-curl "http://localhost:8889/threshold"
+curl -H "X-API-Key: $HANWOO_API_KEY" "http://localhost:8889/threshold"
 ```
 
 ### Response Example
@@ -505,6 +525,7 @@ JSON body.
 
 ```bash
 curl -X PUT "http://localhost:8889/threshold" \
+  -H "X-API-Key: $HANWOO_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"threshold": 31.5798974609375}'
 ```
@@ -538,6 +559,7 @@ JSON body.
 
 ```bash
 curl -X POST "http://localhost:8889/evaluate" \
+  -H "X-API-Key: $HANWOO_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "test_base_dir": "/app/data/test",
