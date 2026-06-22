@@ -1,22 +1,23 @@
 # Hanwoo Vision API
 
-FastAPI service for Hanwoo image matching workflows. The current implemented
-service manages a lot-scoped gallery, stores gallery embeddings in Qdrant, and
-matches a query image against the requested lot.
+FastAPI services for Hanwoo vision workflows. The matching service manages a
+lot-scoped gallery, stores gallery embeddings in Qdrant, and matches a query
+image against the requested lot. The anomaly service runs PatchCore-style
+DINOv2 feature matching against a memory bank and returns anomaly score,
+regions, threshold result, and heatmap overlay.
 
 Full endpoint reference with parameter tables and curl examples:
 [API_ENDPOINTS.md](API_ENDPOINTS.md)
 
 ## Current Status
 
-- Matching service is implemented.
+- Matching service is exposed on host port `8888`.
+- Anomaly service is exposed on host port `8889`.
 - Qdrant is used as the embedding database.
 - Gallery images are stored on disk under a lot/date folder structure.
 - GPU runtime is supported through Docker Compose GPU override.
 - `HANWOO_DEVICE=auto` uses CUDA when available and falls back to CPU when CUDA
   is not detected.
-- Anomaly service folders exist as scaffold, but the active API surface is the
-  matching service.
 
 ## Architecture
 
@@ -24,15 +25,15 @@ Full endpoint reference with parameter tables and curl examples:
 Client
   |
   v
-FastAPI matching service
+FastAPI services
   |
-  +-- preprocessing: optional background removal, tilt correction, crop
+  +-- matching: optional preprocessing -> Swin encoder -> Qdrant search
   |
-  +-- encoder: matching model -> 256-d embedding
+  +-- anomaly: optional preprocessing -> DINOv2 patches -> memory bank score
   |
-  +-- Qdrant: vectors and metadata
+  +-- Qdrant: matching vectors and metadata
   |
-  +-- disk storage: gallery images
+  +-- disk storage: gallery images and anomaly artifacts
 ```
 
 Gallery separation is handled with Qdrant payload filters:
@@ -119,6 +120,11 @@ Environment variables:
 | `DEFAULT_TOP_K` | `5` | Default match result count. |
 | `QDRANT_URL` | `http://qdrant:6333` | Qdrant service URL. |
 | `QDRANT_COLLECTION` | `hanwoo_matching_gallery` | Qdrant collection name. |
+| `ANOMALY_MODEL_PATH` | `/app/models/anomaly/memory_bank.pth` | Anomaly memory bank path. |
+| `ANOMALY_THRESHOLD_PATH` | `/app/models/anomaly/threshold.json` | Anomaly threshold JSON path. |
+| `ANOMALY_DINO_LAYERS` | `10,11` | DINOv2 layers used for patch embeddings. |
+| `ANOMALY_K_NEIGHBORS` | `3` | Nearest neighbors used for patch score. |
+| `ANOMALY_TOP_K_RATIO` | `0.4` | Top patch-score ratio used for image score. |
 
 ## Model Files
 
@@ -131,12 +137,14 @@ models/
 ├── u2net/
 │   └── u2net.onnx
 └── anomaly/
-    ├── memory_bank.faiss
+    ├── memory_bank.pth
     └── threshold.json
 ```
 
 The matching service needs `models/matching/encoder.pt`. Background removal
-needs U2NET files under `models/u2net`.
+needs U2NET files under `models/u2net`. The anomaly service needs
+`models/anomaly/memory_bank.pth`; without it the anomaly container stays up, but
+`/health` reports `not_loaded`.
 
 ## Run With Docker
 
@@ -150,6 +158,12 @@ GPU mode:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+```
+
+Start an already-built GPU runtime:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
 ```
 
 Check containers:
@@ -175,7 +189,8 @@ docker compose down
 Health check:
 
 ```bash
-curl "http://localhost:8000/health"
+curl "http://localhost:8888/health"
+curl "http://localhost:8889/health"
 ```
 
 Expected GPU response includes:
@@ -185,6 +200,25 @@ Expected GPU response includes:
   "status": "healthy",
   "model_loaded": true,
   "device": "cuda"
+}
+```
+
+Current verified GPU health responses:
+
+```json
+{
+  "matching": {
+    "status": "healthy",
+    "model_loaded": true,
+    "device": "cuda"
+  },
+  "anomaly": {
+    "status": "healthy",
+    "bank_loaded": true,
+    "bank_size": 92381,
+    "threshold": 31.5798974609375,
+    "device": "cuda"
+  }
 }
 ```
 
@@ -204,10 +238,11 @@ of silently using CPU.
 Base URL:
 
 ```text
-http://localhost:8000
+matching: http://localhost:8888
+anomaly:  http://localhost:8889
 ```
 
-Implemented endpoints:
+Matching endpoints:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -219,6 +254,16 @@ Implemented endpoints:
 | `DELETE` | `/gallery/images/{name}` | Delete one image by name inside a lot/date scope. |
 | `DELETE` | `/gallery/images` | Clear a lot or lot/date gallery scope. |
 | `POST` | `/match` | Match one query image against a lot/date gallery scope. |
+
+Anomaly endpoints:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/health` | Check anomaly bank, threshold, and device status. |
+| `POST` | `/infer` | Run anomaly detection on one uploaded image. |
+| `GET` | `/threshold` | Read active anomaly threshold. |
+| `PUT` | `/threshold` | Update active anomaly threshold. |
+| `POST` | `/evaluate` | Evaluate server-side test folders. |
 
 Common parameters:
 
@@ -234,7 +279,7 @@ Common parameters:
 Upload one image:
 
 ```bash
-curl -X POST "http://localhost:8000/gallery/images" \
+curl -X POST "http://localhost:8888/gallery/images" \
   -F "lot_id=LOT-001" \
   -F "capture_date=2026-06-22" \
   -F "preprocess=true" \
@@ -244,7 +289,7 @@ curl -X POST "http://localhost:8000/gallery/images" \
 Upload multiple images:
 
 ```bash
-curl -X POST "http://localhost:8000/gallery/images" \
+curl -X POST "http://localhost:8888/gallery/images" \
   -F "lot_id=LOT-001" \
   -F "capture_date=2026-06-22" \
   -F "files=@image_1.jpg" \
@@ -254,39 +299,39 @@ curl -X POST "http://localhost:8000/gallery/images" \
 List one lot:
 
 ```bash
-curl "http://localhost:8000/gallery/images?lot_id=LOT-001"
+curl "http://localhost:8888/gallery/images?lot_id=LOT-001"
 ```
 
 List one lot/date:
 
 ```bash
-curl "http://localhost:8000/gallery/images?lot_id=LOT-001&capture_date=2026-06-22"
+curl "http://localhost:8888/gallery/images?lot_id=LOT-001&capture_date=2026-06-22"
 ```
 
 Match a query image against one lot:
 
 ```bash
-curl -X POST "http://localhost:8000/match?lot_id=LOT-001&top_k=5" \
+curl -X POST "http://localhost:8888/match?lot_id=LOT-001&top_k=5" \
   -F "file=@after_packaging.jpg"
 ```
 
 Match a query image against one lot/date:
 
 ```bash
-curl -X POST "http://localhost:8000/match?lot_id=LOT-001&capture_date=2026-06-22&top_k=5" \
+curl -X POST "http://localhost:8888/match?lot_id=LOT-001&capture_date=2026-06-22&top_k=5" \
   -F "file=@after_packaging.jpg"
 ```
 
 Delete one image from one lot:
 
 ```bash
-curl -X DELETE "http://localhost:8000/gallery/images/before_packaging?lot_id=LOT-001"
+curl -X DELETE "http://localhost:8888/gallery/images/before_packaging?lot_id=LOT-001"
 ```
 
 Clear one lot/date:
 
 ```bash
-curl -X DELETE "http://localhost:8000/gallery/images?lot_id=LOT-001&capture_date=2026-06-22"
+curl -X DELETE "http://localhost:8888/gallery/images?lot_id=LOT-001&capture_date=2026-06-22"
 ```
 
 More examples and response bodies are in [API_ENDPOINTS.md](API_ENDPOINTS.md).
@@ -354,7 +399,7 @@ CUDA not used:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
-curl "http://localhost:8000/health"
+curl "http://localhost:8888/health"
 ```
 
 If health still reports `cpu`, verify NVIDIA runtime on the host:
@@ -366,21 +411,23 @@ docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
 
 ## 한국어 안내
 
-Hanwoo Vision API는 한우 이미지 매칭을 위한 FastAPI 서비스입니다. 현재 구현된
-기능은 로트별 갤러리 등록, Qdrant 기반 임베딩 검색, 쿼리 이미지 매칭입니다.
+Hanwoo Vision API는 한우 이미지 매칭과 이물질 이상탐지를 위한 FastAPI
+서비스입니다. 매칭 서비스는 로트별 갤러리 등록, Qdrant 기반 임베딩 검색, 쿼리
+이미지 매칭을 담당합니다. 이상탐지 서비스는 DINOv2 patch feature와 memory bank를
+사용해 anomaly score, 위치, threshold 결과, heatmap을 반환합니다.
 
 전체 엔드포인트 파라미터와 curl 예시는 [API_ENDPOINTS.md](API_ENDPOINTS.md)에
 정리되어 있습니다.
 
 ## 현재 구현 상태
 
-- 매칭 서비스가 구현되어 있습니다.
+- 매칭 서비스는 host port `8888`에서 접근합니다.
+- 이상탐지 서비스는 host port `8889`에서 접근합니다.
 - 임베딩 DB로 Qdrant를 사용합니다.
 - 갤러리 원본 이미지는 로컬 디스크에 `lot_id/capture_date` 구조로 저장합니다.
 - Docker Compose GPU override로 GPU 실행을 지원합니다.
 - `HANWOO_DEVICE=auto`이면 CUDA 사용 가능 시 GPU를 사용하고, 없으면 CPU로
   fallback합니다.
-- anomaly 서비스 폴더는 scaffold 상태이며, 현재 활성 API는 matching 서비스입니다.
 
 ## 데이터 저장 구조
 
@@ -419,13 +466,39 @@ GPU 모드:
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 ```
 
+이미 빌드된 GPU 런타임 실행:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+```
+
 상태 확인:
 
 ```bash
-curl "http://localhost:8000/health"
+curl "http://localhost:8888/health"
+curl "http://localhost:8889/health"
 ```
 
 GPU 사용 중이면 응답에 `"device": "cuda"`가 포함됩니다.
+
+현재 검증된 GPU 응답:
+
+```json
+{
+  "matching": {
+    "status": "healthy",
+    "model_loaded": true,
+    "device": "cuda"
+  },
+  "anomaly": {
+    "status": "healthy",
+    "bank_loaded": true,
+    "bank_size": 92381,
+    "threshold": 31.5798974609375,
+    "device": "cuda"
+  }
+}
+```
 
 ## 설정값
 
@@ -450,7 +523,7 @@ models/
 ├── u2net/
 │   └── u2net.onnx
 └── anomaly/
-    ├── memory_bank.faiss
+    ├── memory_bank.pth
     └── threshold.json
 ```
 
@@ -462,8 +535,11 @@ models/
 기본 URL:
 
 ```text
-http://localhost:8000
+matching: http://localhost:8888
+anomaly:  http://localhost:8889
 ```
+
+매칭 엔드포인트:
 
 | Method | Path | 설명 |
 | --- | --- | --- |
@@ -475,6 +551,16 @@ http://localhost:8000
 | `DELETE` | `/gallery/images/{name}` | 특정 lot/date 안의 이미지 1개를 삭제합니다. |
 | `DELETE` | `/gallery/images` | 특정 lot 또는 lot/date 갤러리를 비웁니다. |
 | `POST` | `/match` | 쿼리 이미지를 특정 lot/date 갤러리와 매칭합니다. |
+
+이상탐지 엔드포인트:
+
+| Method | Path | 설명 |
+| --- | --- | --- |
+| `GET` | `/health` | anomaly memory bank, threshold, device 상태를 확인합니다. |
+| `POST` | `/infer` | 이미지 1장에 대해 이상탐지를 수행합니다. |
+| `GET` | `/threshold` | 현재 anomaly threshold를 조회합니다. |
+| `PUT` | `/threshold` | anomaly threshold를 변경합니다. |
+| `POST` | `/evaluate` | 컨테이너 내부 테스트 폴더로 성능평가를 수행합니다. |
 
 주요 파라미터:
 
@@ -490,7 +576,7 @@ http://localhost:8000
 이미지 1개 등록:
 
 ```bash
-curl -X POST "http://localhost:8000/gallery/images" \
+curl -X POST "http://localhost:8888/gallery/images" \
   -F "lot_id=LOT-001" \
   -F "capture_date=2026-06-22" \
   -F "preprocess=true" \
@@ -500,32 +586,32 @@ curl -X POST "http://localhost:8000/gallery/images" \
 로트별 이미지 목록 조회:
 
 ```bash
-curl "http://localhost:8000/gallery/images?lot_id=LOT-001"
+curl "http://localhost:8888/gallery/images?lot_id=LOT-001"
 ```
 
 로트와 날짜 기준 조회:
 
 ```bash
-curl "http://localhost:8000/gallery/images?lot_id=LOT-001&capture_date=2026-06-22"
+curl "http://localhost:8888/gallery/images?lot_id=LOT-001&capture_date=2026-06-22"
 ```
 
 이미지 매칭:
 
 ```bash
-curl -X POST "http://localhost:8000/match?lot_id=LOT-001&capture_date=2026-06-22&top_k=5" \
+curl -X POST "http://localhost:8888/match?lot_id=LOT-001&capture_date=2026-06-22&top_k=5" \
   -F "file=@after_packaging.jpg"
 ```
 
 이미지 1개 삭제:
 
 ```bash
-curl -X DELETE "http://localhost:8000/gallery/images/before_packaging?lot_id=LOT-001"
+curl -X DELETE "http://localhost:8888/gallery/images/before_packaging?lot_id=LOT-001"
 ```
 
 특정 로트/날짜 전체 삭제:
 
 ```bash
-curl -X DELETE "http://localhost:8000/gallery/images?lot_id=LOT-001&capture_date=2026-06-22"
+curl -X DELETE "http://localhost:8888/gallery/images?lot_id=LOT-001&capture_date=2026-06-22"
 ```
 
 ## 로트 관리 권장 방식

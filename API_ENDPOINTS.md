@@ -1,12 +1,21 @@
 # Hanwoo Vision API Endpoints
 
-Base URL:
+Matching base URL:
 
 ```text
-http://localhost:8000
+http://localhost:8888
 ```
 
-Current implemented service: matching gallery enrollment and query.
+Anomaly base URL:
+
+```text
+http://localhost:8889
+```
+
+Current implemented services:
+
+- Matching gallery enrollment/query on host port `8888`.
+- Anomaly detection inference on host port `8889`.
 
 Gallery data is scoped by `lot_id`. Images are stored under
 `storage/matching/gallery_images/{lot_id}/{capture_date}`. Embeddings and
@@ -32,7 +41,7 @@ None.
 ### Example
 
 ```bash
-curl "http://localhost:8000/health"
+curl "http://localhost:8888/health"
 ```
 
 ### Response Example
@@ -57,7 +66,7 @@ None.
 ### Example
 
 ```bash
-curl "http://localhost:8000/metadata"
+curl "http://localhost:8888/metadata"
 ```
 
 ### Response Example
@@ -90,19 +99,19 @@ Lists enrolled gallery images. Can list all images or filter by lot/date.
 List all gallery images:
 
 ```bash
-curl "http://localhost:8000/gallery/images"
+curl "http://localhost:8888/gallery/images"
 ```
 
 List one lot:
 
 ```bash
-curl "http://localhost:8000/gallery/images?lot_id=LOT-001"
+curl "http://localhost:8888/gallery/images?lot_id=LOT-001"
 ```
 
 List one lot and date:
 
 ```bash
-curl "http://localhost:8000/gallery/images?lot_id=LOT-001&capture_date=2026-06-22"
+curl "http://localhost:8888/gallery/images?lot_id=LOT-001&capture_date=2026-06-22"
 ```
 
 ### Response Example
@@ -144,7 +153,7 @@ Multipart form-data.
 ### Example
 
 ```bash
-curl -X POST "http://localhost:8000/gallery/images" \
+curl -X POST "http://localhost:8888/gallery/images" \
   -F "lot_id=LOT-001" \
   -F "capture_date=2026-06-22" \
   -F "preprocess=false" \
@@ -154,7 +163,7 @@ curl -X POST "http://localhost:8000/gallery/images" \
 Multiple files:
 
 ```bash
-curl -X POST "http://localhost:8000/gallery/images" \
+curl -X POST "http://localhost:8888/gallery/images" \
   -F "lot_id=LOT-001" \
   -F "capture_date=2026-06-22" \
   -F "preprocess=true" \
@@ -198,7 +207,7 @@ JSON body.
 ### Example
 
 ```bash
-curl -X POST "http://localhost:8000/gallery/import-directory" \
+curl -X POST "http://localhost:8888/gallery/import-directory" \
   -H "Content-Type: application/json" \
   -d '{
     "directory": "/app/data/lot_001",
@@ -242,13 +251,13 @@ matching `name` entries across all dates in that lot.
 Delete from a lot:
 
 ```bash
-curl -X DELETE "http://localhost:8000/gallery/images/before_packaging?lot_id=LOT-001"
+curl -X DELETE "http://localhost:8888/gallery/images/before_packaging?lot_id=LOT-001"
 ```
 
 Delete from a lot/date:
 
 ```bash
-curl -X DELETE "http://localhost:8000/gallery/images/before_packaging?lot_id=LOT-001&capture_date=2026-06-22"
+curl -X DELETE "http://localhost:8888/gallery/images/before_packaging?lot_id=LOT-001&capture_date=2026-06-22"
 ```
 
 ### Response Example
@@ -278,13 +287,13 @@ only that date is cleared; otherwise the whole lot is cleared.
 Clear one lot:
 
 ```bash
-curl -X DELETE "http://localhost:8000/gallery/images?lot_id=LOT-001"
+curl -X DELETE "http://localhost:8888/gallery/images?lot_id=LOT-001"
 ```
 
 Clear one date in one lot:
 
 ```bash
-curl -X DELETE "http://localhost:8000/gallery/images?lot_id=LOT-001&capture_date=2026-06-22"
+curl -X DELETE "http://localhost:8888/gallery/images?lot_id=LOT-001&capture_date=2026-06-22"
 ```
 
 ### Response Example
@@ -319,14 +328,14 @@ Multipart form-data plus query params.
 Match against one lot:
 
 ```bash
-curl -X POST "http://localhost:8000/match?lot_id=LOT-001&top_k=5&preprocess=false" \
+curl -X POST "http://localhost:8888/match?lot_id=LOT-001&top_k=5&preprocess=false" \
   -F "file=@after_packaging.jpg"
 ```
 
 Match against one lot/date:
 
 ```bash
-curl -X POST "http://localhost:8000/match?lot_id=LOT-001&capture_date=2026-06-22&top_k=5&preprocess=false" \
+curl -X POST "http://localhost:8888/match?lot_id=LOT-001&capture_date=2026-06-22&top_k=5&preprocess=false" \
   -F "file=@after_packaging.jpg"
 ```
 
@@ -378,4 +387,162 @@ Empty matching scope returns `404`.
 {
   "detail": "Gallery scope is empty"
 }
+```
+
+# Anomaly Endpoints
+
+Anomaly service runs separately on host port `8889`.
+
+```text
+http://localhost:8889
+```
+
+The anomaly service requires `models/anomaly/memory_bank.pth`. If the file is
+missing or invalid, the container stays up and `/health` returns `not_loaded`.
+
+## GET `/health`
+
+Checks anomaly memory bank, threshold, and runtime device.
+
+### Example
+
+```bash
+curl "http://localhost:8889/health"
+```
+
+### Response Example
+
+```json
+{
+  "status": "healthy",
+  "bank_loaded": true,
+  "bank_size": 92381,
+  "threshold": 31.5798974609375,
+  "device": "cuda"
+}
+```
+
+Not loaded example:
+
+```json
+{
+  "status": "not_loaded",
+  "bank_loaded": false,
+  "bank_size": 0,
+  "threshold": null,
+  "device": "cuda"
+}
+```
+
+## POST `/infer`
+
+Runs anomaly detection on one uploaded image.
+
+### Params
+
+Multipart form-data plus query params.
+
+| Name | Location | Required | Type | Description |
+| --- | --- | --- | --- | --- |
+| `file` | form file | Yes | image file | Hanwoo image to inspect. |
+| `preprocess` | query | No | boolean | Defaults to `true`. Applies background removal, tilt correction, and crop. |
+
+### Example
+
+```bash
+curl -X POST "http://localhost:8889/infer?preprocess=true" \
+  -F "file=@sample.jpg"
+```
+
+### Response Example
+
+```json
+{
+  "filename": "sample.jpg",
+  "preprocess": true,
+  "preprocess_ms": 120.4,
+  "infer_ms": 85.2,
+  "total_ms": 205.6,
+  "anomaly_score": 64.5881,
+  "is_anomaly": true,
+  "threshold": 31.5799,
+  "regions": ["상단 중앙"],
+  "heatmap_b64": "..."
+}
+```
+
+## GET `/threshold`
+
+Returns the active anomaly threshold.
+
+### Example
+
+```bash
+curl "http://localhost:8889/threshold"
+```
+
+### Response Example
+
+```json
+{
+  "threshold": 31.5798974609375
+}
+```
+
+## PUT `/threshold`
+
+Updates and persists the anomaly threshold.
+
+### Params
+
+JSON body.
+
+| Name | Location | Required | Type | Description |
+| --- | --- | --- | --- | --- |
+| `threshold` | body | Yes | float | Must be greater than `0`. |
+
+### Example
+
+```bash
+curl -X PUT "http://localhost:8889/threshold" \
+  -H "Content-Type: application/json" \
+  -d '{"threshold": 31.5798974609375}'
+```
+
+### Response Example
+
+```json
+{
+  "threshold": 31.5798974609375,
+  "updated": true
+}
+```
+
+## POST `/evaluate`
+
+Evaluates anomaly performance against server-side test folders. This endpoint
+expects images and labels to exist inside the API container.
+
+### Params
+
+JSON body.
+
+| Name | Location | Required | Type | Description |
+| --- | --- | --- | --- | --- |
+| `test_base_dir` | body | No | string | Base directory for anomaly category folders. Defaults to `/app/data/test`. |
+| `category_dirs` | body | No | string array | Category folders under `test_base_dir`. |
+| `images2_dir` | body | No | string | Normal images folder. Defaults to `/app/data/test/images2`. |
+| `preprocess` | body | No | boolean | Defaults to `true`. |
+
+### Example
+
+```bash
+curl -X POST "http://localhost:8889/evaluate" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "test_base_dir": "/app/data/test",
+    "category_dirs": ["비닐", "뼈", "실", "정맥혈응고체", "천"],
+    "images2_dir": "/app/data/test/images2",
+    "preprocess": true
+  }'
 ```

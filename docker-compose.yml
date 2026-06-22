@@ -3,7 +3,7 @@ services:
     build: .
     command: uvicorn hanwoo.services.matching.main:app --host 0.0.0.0 --port 8000
     ports:
-      - "8000:8000"
+      - "8888:8000"
     environment:
       HANWOO_DEVICE: auto
       MATCHING_MODEL_PATH: /app/models/matching/encoder.pt
@@ -17,6 +17,20 @@ services:
       - ./storage:/app/storage
     depends_on:
       - qdrant
+
+  anomaly:
+    build: .
+    command: uvicorn hanwoo.services.anomaly.main:app --host 0.0.0.0 --port 8001
+    ports:
+      - "8889:8001"
+    environment:
+      HANWOO_DEVICE: auto
+      ANOMALY_MODEL_PATH: /app/models/anomaly/memory_bank.pth
+      ANOMALY_THRESHOLD_PATH: /app/models/anomaly/threshold.json
+      U2NET_HOME: /app/models/u2net
+    volumes:
+      - ./models:/app/models:ro
+      - ./storage:/app/storage
 
   qdrant:
     image: qdrant/qdrant:latest

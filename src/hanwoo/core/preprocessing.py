@@ -851,3 +851,7 @@ def preprocess_for_matching(image: Image.Image) -> Image.Image:
     proc_img, bg_mask = crop_image_by_mask(proc_img, bg_mask, padding=0)
     proc_img, _ = crop_image_by_mask(proc_img, bg_mask, padding=0)
     return proc_img.convert("RGB")
+
+
+def preprocess(image: Image.Image) -> Image.Image:
+    return preprocess_for_matching(image)

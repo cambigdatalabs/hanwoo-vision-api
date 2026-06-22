@@ -18,4 +18,4 @@ COPY src ./src
 
 RUN python3 -m pip install --no-cache-dir --break-system-packages -e .
 
-EXPOSE 8000
+EXPOSE 8000 8001
