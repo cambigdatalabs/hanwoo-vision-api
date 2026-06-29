@@ -834,6 +834,7 @@ def smart_crop(image: Image.Image, padding: int = 0) -> Image.Image:
 
 
 def preprocess_for_matching(image: Image.Image) -> Image.Image:
+    image = image.resize((max(1, image.width // 4), max(1, image.height // 4)))
     proc_img, bg_mask = remove_background(image, return_mask=True, model_name="u2net")
     detected_angle = detect_top_line_tilt_angle(bg_mask)
 

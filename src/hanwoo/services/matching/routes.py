@@ -8,6 +8,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from PIL import Image
 
 from hanwoo.core.config import DEFAULT_TOP_K, MATCHING_MODEL_PATH, STORAGE_DIR
+from hanwoo.core.image_payload import attach_image_payload
 from hanwoo.core.preprocessing import preprocess_for_matching
 from hanwoo.core.schemas import DirectoryImportRequest
 from hanwoo.services.matching.pipeline import MatchingService
@@ -26,6 +27,22 @@ def get_matching_service() -> MatchingService:
     if matching_service is None:
         raise RuntimeError("Matching service is not initialized")
     return matching_service
+
+
+def attach_match_image(match: dict) -> dict:
+    image_path = Path(str(match["image_path"]))
+    if not image_path.is_file():
+        raise HTTPException(
+            status_code=500,
+            detail=f"Matched image file not found: {image_path}",
+        )
+    try:
+        return attach_image_payload(match)
+    except OSError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Matched image file could not be read: {image_path}",
+        ) from exc
 
 
 async def read_image(file: UploadFile) -> Image.Image:
@@ -177,7 +194,7 @@ async def match_image(
     preprocess: Annotated[
         bool,
         Query(description="Apply background removal, tilt correction, and crop."),
-    ] = False,
+    ] = True,
     capture_date: Annotated[str | None, Query()] = None,
 ):
     image = await read_image(file)
@@ -194,6 +211,7 @@ async def match_image(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     if not matches:
         raise HTTPException(status_code=404, detail="Gallery scope is empty")
+    matches = [attach_match_image(matches[0]), *matches[1:]]
     return {
         "query_file": file.filename,
         "lot_id": lot_id,

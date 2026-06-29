@@ -38,7 +38,7 @@ metadata are stored in Qdrant collection `hanwoo_matching_gallery`.
 | `lot_id` | form/query/body | Yes for enroll, match, delete, clear | string | Lot identifier used to separate gallery pools. Same filename can exist in different lots. |
 | `capture_date` | form/query/body | No | string, `YYYY-MM-DD` | Narrows gallery scope by date. During upload, defaults to server date when omitted. |
 | `preprocess` | form/query/body | No | boolean | Applies background removal, tilt correction, and crop. |
-| `top_k` | query | No | integer, 1-50 | Number of nearest matches to return. Defaults to server config. |
+| `top_k` | query | No | integer, 1-50 | Number of nearest matches to return. Only the top match includes base64 image data. Defaults to server config. |
 
 ## GET `/health`
 
@@ -326,7 +326,9 @@ curl -X DELETE "http://localhost:8888/gallery/images?lot_id=LOT-001&capture_date
 ## POST `/match`
 
 Matches a query image against the gallery for the requested lot. If
-`capture_date` is supplied, matching is restricted to that lot/date.
+`capture_date` is supplied, matching is restricted to that lot/date. The
+response returns up to `top_k` matches with image paths; only the first match
+includes the full image as base64.
 
 ### Params
 
@@ -337,15 +339,15 @@ Multipart form-data plus query params.
 | `file` | form file | Yes | image file | Query image. |
 | `lot_id` | query | Yes | string | Lot identifier used to scope matching. |
 | `capture_date` | query | No | string, `YYYY-MM-DD` | Search only this date. |
-| `top_k` | query | No | integer, 1-50 | Number of matches to return. |
-| `preprocess` | query | No | boolean | Defaults to `false`. |
+| `top_k` | query | No | integer, 1-50 | Number of matches to return. Only rank 1 includes image bytes. |
+| `preprocess` | query | No | boolean | Defaults to `true`. Applies background removal, tilt correction, and crop. |
 
 ### Examples
 
 Match against one lot:
 
 ```bash
-curl -X POST "http://localhost:8888/match?lot_id=LOT-001&top_k=5&preprocess=false" \
+curl -X POST "http://localhost:8888/match?lot_id=LOT-001&top_k=5" \
   -H "X-API-Key: $HANWOO_API_KEY" \
   -F "file=@after_packaging.jpg"
 ```
@@ -353,7 +355,7 @@ curl -X POST "http://localhost:8888/match?lot_id=LOT-001&top_k=5&preprocess=fals
 Match against one lot/date:
 
 ```bash
-curl -X POST "http://localhost:8888/match?lot_id=LOT-001&capture_date=2026-06-22&top_k=5&preprocess=false" \
+curl -X POST "http://localhost:8888/match?lot_id=LOT-001&capture_date=2026-06-22&top_k=5" \
   -H "X-API-Key: $HANWOO_API_KEY" \
   -F "file=@after_packaging.jpg"
 ```
@@ -366,7 +368,7 @@ curl -X POST "http://localhost:8888/match?lot_id=LOT-001&capture_date=2026-06-22
   "lot_id": "LOT-001",
   "capture_date": "2026-06-22",
   "top_k": 1,
-  "preprocess": false,
+  "preprocess": true,
   "matches": [
     {
       "rank": 1,
@@ -376,6 +378,9 @@ curl -X POST "http://localhost:8888/match?lot_id=LOT-001&capture_date=2026-06-22
       "distance": 0.0,
       "similarity": 100.0,
       "image_path": "/app/storage/matching/gallery_images/LOT-001/2026-06-22/before_packaging.png",
+      "image_mime_type": "image/png",
+      "image_size_bytes": 123456,
+      "image_base64": "iVBORw0KGgo...",
       "matched_variant": "original"
     }
   ]
