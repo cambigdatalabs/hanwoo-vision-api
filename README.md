@@ -251,6 +251,16 @@ matching: http://localhost:8888
 anomaly:  http://localhost:8889
 ```
 
+Validator UI:
+
+```text
+http://localhost:8888/validator
+```
+
+Use a folder with `before/` query images and `after/` gallery images for
+matching accuracy. The page also has an anomaly batch panel for the anomaly
+service.
+
 Matching endpoints:
 
 | Method | Path | Purpose |

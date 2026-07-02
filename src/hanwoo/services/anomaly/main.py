@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from hanwoo.core.auth import APIKeyAuthMiddleware, get_required_api_key
 from hanwoo.core.config import DEVICE
@@ -14,6 +17,7 @@ from hanwoo.services.anomaly.routes import router, set_anomaly_service
 anomaly_service = AnomalyService(device_name=DEVICE)
 set_anomaly_service(anomaly_service)
 logger = logging.getLogger(__name__)
+VALIDATOR_HTML = Path(__file__).parents[1] / "matching" / "static" / "validator.html"
 
 
 @asynccontextmanager
@@ -32,4 +36,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.add_middleware(APIKeyAuthMiddleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(router)
+
+
+@app.get("/validator", include_in_schema=False)
+def validator_ui():
+    return FileResponse(VALIDATOR_HTML)

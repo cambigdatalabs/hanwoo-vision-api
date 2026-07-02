@@ -453,7 +453,10 @@ def _detect_top_horizontal_line(mask: Image.Image):
 
     candidates = []
     for line in lines:
-        x1, y1, x2, y2 = line[0]
+        coords = np.asarray(line).reshape(-1)
+        if coords.size < 4:
+            continue
+        x1, y1, x2, y2 = coords[:4]
         dx = x2 - x1
         dy = y2 - y1
         if dx == 0:

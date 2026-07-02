@@ -37,3 +37,6 @@ test = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"hanwoo.services.matching" = ["static/*.html"]
