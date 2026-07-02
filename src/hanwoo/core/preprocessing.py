@@ -696,6 +696,26 @@ def crop_image_by_mask(image: Image.Image, mask: Image.Image, padding: int = 0):
     return image.crop(box), mask.crop(box)
 
 
+def fill_mask_holes(mask: Image.Image) -> Image.Image:
+    """Fill enclosed background holes in a foreground mask."""
+    mask_np = np.array(mask.convert("L"))
+    _, foreground = cv2.threshold(mask_np, 10, 255, cv2.THRESH_BINARY)
+    background = cv2.bitwise_not(foreground)
+    border_bg = np.zeros_like(background)
+    border_bg[0, :] = background[0, :]
+    border_bg[-1, :] = background[-1, :]
+    border_bg[:, 0] = background[:, 0]
+    border_bg[:, -1] = background[:, -1]
+
+    _, labels, stats, _ = cv2.connectedComponentsWithStats(background, connectivity=8)
+    outside_labels = set(np.unique(labels[border_bg > 0]))
+    filled = foreground.copy()
+    for label in range(1, len(stats)):
+        if label not in outside_labels:
+            filled[labels == label] = 255
+    return Image.fromarray(filled, mode="L")
+
+
 def correct_horizontal_balance(image: Image.Image) -> Image.Image:
     """
     Rotate image to correct horizontal tilt/balance.
@@ -833,7 +853,7 @@ def smart_crop(image: Image.Image, padding: int = 0) -> Image.Image:
         return image.crop((left, top, right, bottom))
 
 
-def preprocess_for_matching(image: Image.Image) -> Image.Image:
+def preprocess_for_matching_with_rgba(image: Image.Image) -> tuple[Image.Image, Image.Image]:
     image = image.resize((max(1, image.width // 4), max(1, image.height // 4)))
     proc_img, bg_mask = remove_background(image, return_mask=True, model_name="u2net")
     detected_angle = detect_top_line_tilt_angle(bg_mask)
@@ -850,8 +870,16 @@ def preprocess_for_matching(image: Image.Image) -> Image.Image:
         proc_img, bg_mask = img_neg, mask_neg
 
     proc_img, bg_mask = crop_image_by_mask(proc_img, bg_mask, padding=0)
-    proc_img, _ = crop_image_by_mask(proc_img, bg_mask, padding=0)
-    return proc_img.convert("RGB")
+    proc_img, bg_mask = crop_image_by_mask(proc_img, bg_mask, padding=0)
+    bg_mask = fill_mask_holes(bg_mask)
+    proc_img = apply_mask_to_rgb(proc_img, bg_mask, rembg_output=proc_img)
+    rgb_image = proc_img.convert("RGB")
+    rgba_image = proc_img.convert("RGBA")
+    return rgb_image, rgba_image
+
+
+def preprocess_for_matching(image: Image.Image) -> Image.Image:
+    return preprocess_for_matching_with_rgba(image)[0]
 
 
 def preprocess(image: Image.Image) -> Image.Image:

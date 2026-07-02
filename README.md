@@ -281,7 +281,7 @@ Common parameters:
 | `lot_id` | Yes for upload, import, match, delete, clear | Gallery and matching endpoints | Separates gallery pools by production lot. |
 | `capture_date` | No | Gallery and matching endpoints | Narrows a lot to one date. Format: `YYYY-MM-DD`. |
 | `preprocess` | No | Upload, import, match | Enables background removal and normalization. |
-| `top_k` | No | Match | Number of nearest matches to return. Only rank 1 includes base64 image data. |
+| `top_k` | No | Match | Number of nearest matches to return. Only rank 1 includes transparent RGBA PNG base64 image data. |
 
 ## API Examples
 
@@ -585,7 +585,7 @@ anomaly:  http://localhost:8889
 | `lot_id` | 등록, 매칭, 삭제에서 필수 | 갤러리를 로트별로 분리합니다. |
 | `capture_date` | 선택 | 날짜 단위로 추가 필터링합니다. 형식은 `YYYY-MM-DD`. |
 | `preprocess` | 선택 | 배경 제거, tilt 보정, crop 전처리를 수행합니다. |
-| `top_k` | 선택 | 반환할 매칭 결과 개수입니다. 1위 결과만 base64 이미지 데이터를 포함합니다. |
+| `top_k` | 선택 | 반환할 매칭 결과 개수입니다. 1위 결과만 투명 배경 RGBA PNG base64 이미지 데이터를 포함합니다. |
 
 ## API 예시
 

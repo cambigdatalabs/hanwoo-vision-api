@@ -328,7 +328,9 @@ curl -X DELETE "http://localhost:8888/gallery/images?lot_id=LOT-001&capture_date
 Matches a query image against the gallery for the requested lot. If
 `capture_date` is supplied, matching is restricted to that lot/date. The
 response returns up to `top_k` matches with image paths; only the first match
-includes the full image as base64.
+includes the full image as transparent RGBA PNG base64.
+The transparent image is generated during gallery preprocessing and does not
+change the RGB image used for embeddings.
 
 ### Params
 
@@ -339,7 +341,7 @@ Multipart form-data plus query params.
 | `file` | form file | Yes | image file | Query image. |
 | `lot_id` | query | Yes | string | Lot identifier used to scope matching. |
 | `capture_date` | query | No | string, `YYYY-MM-DD` | Search only this date. |
-| `top_k` | query | No | integer, 1-50 | Number of matches to return. Only rank 1 includes image bytes. |
+| `top_k` | query | No | integer, 1-50 | Number of matches to return. Only rank 1 includes transparent RGBA PNG bytes. |
 | `preprocess` | query | No | boolean | Defaults to `true`. Applies background removal, tilt correction, and crop. |
 
 ### Examples
