@@ -36,6 +36,21 @@ services:
       - ./models:/app/models:ro
       - ./storage:/app/storage
 
+  dinomaly:
+    build: .
+    command: uvicorn hanwoo.services.dinomaly.main:app --host 0.0.0.0 --port 8002
+    ports:
+      - "8890:8002"
+    environment:
+      HANWOO_DEVICE: auto
+      DINOMALY_MODEL_PATH: /app/models/dinomaly/best_model.pth
+      DINOMALY_THRESHOLD: 0.21
+      DINOMALY_SCORE_MODE: roi_max
+      U2NET_HOME: /app/models/u2net
+      HANWOO_API_KEY: ${HANWOO_API_KEY:?Set HANWOO_API_KEY in .env}
+    volumes:
+      - ./models:/app/models:ro
+
   validator:
     build: .
     command: >

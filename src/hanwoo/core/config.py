@@ -46,3 +46,11 @@ ANOMALY_TOP_K_RATIO = float(os.getenv("ANOMALY_TOP_K_RATIO", "0.4"))
 ANOMALY_THRESH_PERCENTILE = int(os.getenv("ANOMALY_THRESH_PERCENTILE", "87"))
 ANOMALY_IMAGE_SIZE: tuple[int, int] = (672, 672)
 ANOMALY_HEATMAP_POW = float(os.getenv("ANOMALY_HEATMAP_POW", "2.5"))
+
+DINOMALY_MODEL_PATH = Path(
+    os.getenv("DINOMALY_MODEL_PATH", MODELS_DIR / "dinomaly" / "best_model.pth")
+)
+DINOMALY_THRESHOLD = float(os.getenv("DINOMALY_THRESHOLD", "0.21"))
+DINOMALY_SCORE_MODE = os.getenv("DINOMALY_SCORE_MODE", "roi_max")
+DINOMALY_TOP_K_RATIO = float(os.getenv("DINOMALY_TOP_K_RATIO", "0.01"))
+DINOMALY_ENCODER_NAME = os.getenv("DINOMALY_ENCODER_NAME", "dinov2reg_vit_base_14")
