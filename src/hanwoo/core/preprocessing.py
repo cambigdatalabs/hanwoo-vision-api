@@ -885,5 +885,25 @@ def preprocess_for_matching(image: Image.Image) -> Image.Image:
     return preprocess_for_matching_with_rgba(image)[0]
 
 
+def preprocess_for_anomaly(image: Image.Image) -> Image.Image:
+    proc_img, bg_mask = remove_background(image, return_mask=True, model_name="u2net")
+    detected_angle = detect_top_line_tilt_angle(bg_mask)
+
+    img_pos, mask_pos = rotate_image_and_mask(proc_img, bg_mask, detected_angle)
+    residual_pos = abs(detect_top_line_tilt_angle(mask_pos))
+
+    img_neg, mask_neg = rotate_image_and_mask(proc_img, bg_mask, -detected_angle)
+    residual_neg = abs(detect_top_line_tilt_angle(mask_neg))
+
+    if residual_pos <= residual_neg:
+        proc_img, bg_mask = img_pos, mask_pos
+    else:
+        proc_img, bg_mask = img_neg, mask_neg
+
+    proc_img, bg_mask = crop_image_by_mask(proc_img, bg_mask, padding=0)
+    proc_img, _ = crop_image_by_mask(proc_img, bg_mask, padding=0)
+    return proc_img.convert("RGB")
+
+
 def preprocess(image: Image.Image) -> Image.Image:
-    return preprocess_for_matching(image)
+    return preprocess_for_anomaly(image)

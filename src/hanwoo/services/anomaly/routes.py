@@ -67,7 +67,7 @@ async def infer(
 
     t0 = time.perf_counter()
     if preprocess:
-        from hanwoo.core.preprocessing import preprocess as do_preprocess
+        from hanwoo.core.preprocessing import preprocess_for_anomaly as do_preprocess
         try:
             image = do_preprocess(image)
         except Exception:
@@ -144,7 +144,7 @@ def evaluate(req: EvaluateRequest):
         raise HTTPException(status_code=400, detail="임계값이 없습니다.")
 
     if req.preprocess:
-        from hanwoo.core.preprocessing import preprocess as do_preprocess
+        from hanwoo.core.preprocessing import preprocess_for_anomaly as do_preprocess
     else:
         do_preprocess = None
 
@@ -152,6 +152,8 @@ def evaluate(req: EvaluateRequest):
     all_scores, all_labels = [], []
     cat_data: dict[str, dict] = {}
     skipped = []
+    total_preprocess_ms = 0.0
+    total_infer_ms = 0.0
 
     for cat in req.category_dirs:
         image_dir = Path(req.test_base_dir) / cat / "images"
@@ -176,12 +178,16 @@ def evaluate(req: EvaluateRequest):
 
             try:
                 image = Image.open(img_file).convert("RGB")
+                t_preprocess = time.perf_counter()
                 if do_preprocess:
                     try:
                         image = do_preprocess(image)
                     except Exception:
                         pass
+                total_preprocess_ms += (time.perf_counter() - t_preprocess) * 1000
+                t_infer = time.perf_counter()
                 result = svc.predict(image)
+                total_infer_ms += (time.perf_counter() - t_infer) * 1000
                 score = result["anomaly_score"]
 
                 gt_np = np.array(Image.open(lbl_file).convert("L"))
@@ -204,12 +210,16 @@ def evaluate(req: EvaluateRequest):
                 continue
             try:
                 image = Image.open(img_file).convert("RGB")
+                t_preprocess = time.perf_counter()
                 if do_preprocess:
                     try:
                         image = do_preprocess(image)
                     except Exception:
                         pass
+                total_preprocess_ms += (time.perf_counter() - t_preprocess) * 1000
+                t_infer = time.perf_counter()
                 result = svc.predict(image)
+                total_infer_ms += (time.perf_counter() - t_infer) * 1000
                 score = result["anomaly_score"]
 
                 all_scores.append(score); all_labels.append(0)
@@ -224,10 +234,14 @@ def evaluate(req: EvaluateRequest):
     if not all_scores:
         raise HTTPException(status_code=400, detail=f"평가할 이미지가 없습니다. skipped: {skipped[:3]}")
 
+    n_evaluated = len(all_scores)
     return {
         "total": _compute_metrics(all_scores, all_labels, threshold),
         "categories": {cat: _compute_metrics(d["scores"], d["labels"], threshold) for cat, d in cat_data.items()},
-        "n_evaluated": len(all_scores),
+        "n_evaluated": n_evaluated,
         "n_skipped": len(skipped),
+        "avg_preprocess_ms": round(total_preprocess_ms / n_evaluated, 1),
+        "avg_infer_ms": round(total_infer_ms / n_evaluated, 1),
+        "avg_total_ms": round((total_preprocess_ms + total_infer_ms) / n_evaluated, 1),
         "skipped": skipped[:10],
     }

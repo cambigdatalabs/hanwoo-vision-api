@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+from time import perf_counter
 from pathlib import Path
 from typing import Annotated
 
@@ -205,6 +206,7 @@ async def match_image(
     capture_date: Annotated[str | None, Query()] = None,
 ):
     image = await read_image(file)
+    compute_start = perf_counter()
     if preprocess:
         image, _ = preprocess_for_matching_with_rgba(image)
     try:
@@ -216,6 +218,7 @@ async def match_image(
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    query_compute_ms = (perf_counter() - compute_start) * 1000.0
     if not matches:
         raise HTTPException(status_code=404, detail="Gallery scope is empty")
     matches = [attach_match_image(matches[0]), *matches[1:]]
@@ -225,5 +228,6 @@ async def match_image(
         "capture_date": capture_date,
         "top_k": min(top_k, len(matches)),
         "preprocess": preprocess,
+        "query_compute_ms": query_compute_ms,
         "matches": matches,
     }

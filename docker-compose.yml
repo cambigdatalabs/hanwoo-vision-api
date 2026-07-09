@@ -6,13 +6,14 @@ services:
       - "8888:8000"
     environment:
       HANWOO_DEVICE: auto
-      MATCHING_MODEL_PATH: /app/models/matching/encoder.pt
+      MATCHING_MODEL_PATH: /app/models/matching/encoder_old.pt
       HANWOO_STORAGE_DIR: /app/storage/matching
       U2NET_HOME: /app/models/u2net
       DEFAULT_TOP_K: 5
       HANWOO_API_KEY: ${HANWOO_API_KEY:?Set HANWOO_API_KEY in .env}
       QDRANT_URL: http://qdrant:6333
       QDRANT_COLLECTION: hanwoo_matching_gallery
+      VALIDATOR_URL: http://localhost:8501/validator
     volumes:
       - ./models:/app/models:ro
       - ./storage:/app/storage
@@ -30,9 +31,31 @@ services:
       ANOMALY_THRESHOLD_PATH: /app/models/anomaly/threshold.json
       U2NET_HOME: /app/models/u2net
       HANWOO_API_KEY: ${HANWOO_API_KEY:?Set HANWOO_API_KEY in .env}
+      VALIDATOR_URL: http://localhost:8501/validator
     volumes:
       - ./models:/app/models:ro
       - ./storage:/app/storage
+
+  validator:
+    build: .
+    command: >
+      streamlit run src/hanwoo/services/validator/streamlit_app.py
+      --server.address=0.0.0.0
+      --server.port=8501
+      --server.baseUrlPath=validator
+      --server.maxUploadSize=1024
+      --browser.gatherUsageStats=false
+    ports:
+      - "8501:8501"
+    environment:
+      MATCHING_API_BASE_URL: http://matching:8000
+      ANOMALY_API_BASE_URL: http://anomaly:8001
+      HANWOO_API_KEY: ${HANWOO_API_KEY:?Set HANWOO_API_KEY in .env}
+    volumes:
+      - ./storage:/app/storage
+    depends_on:
+      - matching
+      - anomaly
 
   qdrant:
     image: qdrant/qdrant:latest
