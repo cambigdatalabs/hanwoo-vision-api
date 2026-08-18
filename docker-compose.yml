@@ -21,7 +21,11 @@ services:
     depends_on:
       - qdrant
 
+  # Superseded by dinomaly, which now serves port 8889. Start it with
+  # `docker compose --profile legacy up -d anomaly` (it will claim 8889 too,
+  # so stop dinomaly first).
   anomaly:
+    profiles: ["legacy"]
     build: .
     gpus: all
     command: uvicorn hanwoo.services.anomaly.main:app --host 0.0.0.0 --port 8001
@@ -44,6 +48,7 @@ services:
     command: uvicorn hanwoo.services.dinomaly.main:app --host 0.0.0.0 --port 8002
     ports:
       - "8890:8002"
+      - "8889:8002"   # the retired anomaly service's port
     environment:
       HANWOO_DEVICE: auto
       DINOMALY_MODEL_PATH: /app/models/dinomaly/best_model.pth
@@ -68,6 +73,7 @@ services:
       - "8501:8501"
     environment:
       MATCHING_API_BASE_URL: http://matching:8000
+      # The Anomaly tab drives POST /evaluate, which only the legacy service has.
       ANOMALY_API_BASE_URL: http://anomaly:8001
       DINOMALY_API_BASE_URL: http://dinomaly:8002
       HANWOO_API_KEY: ${HANWOO_API_KEY:?Set HANWOO_API_KEY in .env}
@@ -77,7 +83,7 @@ services:
       - ./storage:/app/storage
     depends_on:
       - matching
-      - anomaly
+      - dinomaly
 
   qdrant:
     image: qdrant/qdrant:latest
