@@ -42,10 +42,7 @@ FastAPI services
   |
   +-- Qdrant: matching vectors and metadata
   |
-  +-- disk storage: gallery images and anomaly artifacts
-
-Retired, available under the `legacy` profile:
-  +-- anomaly: optional preprocessing -> DINOv2 patches -> memory bank score
+  +-- disk storage: gallery images and inference artifacts
 ```
 
 Gallery separation is handled with Qdrant payload filters:
@@ -90,7 +87,8 @@ hanwoo-vision-api/
 │   │   └── gpu.py
 │   └── services/
 │       ├── matching/
-│       └── anomaly/
+│       ├── dinomaly/
+│       └── validator/
 ├── models/
 ├── gateway/
 ├── scripts/
@@ -138,11 +136,6 @@ Environment variables:
 | `DINOMALY_SCORE_MODE` | `roi_topk` | `roi_topk`, `roi_max`, or `full`. Changeable at runtime via `PUT /score-mode`. |
 | `DINOMALY_TOP_K_RATIO` | `0.01` | Fraction of ROI pixels averaged for `roi_topk`. |
 | `MATCHING_DOWNSCALE` | `1` | Divisor applied before preprocessing. `1` matches how the training set was built; `4` is ~2x faster and costs ~2.5 accuracy points. |
-| `ANOMALY_MODEL_PATH` | `/app/models/anomaly/memory_bank.pth` | Legacy anomaly memory bank path. |
-| `ANOMALY_THRESHOLD_PATH` | `/app/models/anomaly/threshold.json` | Legacy anomaly threshold JSON path. |
-| `ANOMALY_DINO_LAYERS` | `10,11` | Legacy: DINOv2 layers used for patch embeddings. |
-| `ANOMALY_K_NEIGHBORS` | `3` | Legacy: nearest neighbors used for patch score. |
-| `ANOMALY_TOP_K_RATIO` | `0.4` | Legacy: top patch-score ratio used for image score. |
 
 ## Model Files
 
@@ -154,19 +147,19 @@ models/
 │   └── encoder.pt
 ├── u2net/
 │   └── u2net.onnx
-├── dinomaly/
-│   └── best_model.pth
-└── anomaly/            # legacy profile only
-    ├── memory_bank.pth
-    └── threshold.json
+└── dinomaly/
+    └── best_model.pth
 ```
 
 The matching service needs `models/matching/encoder.pt`. Background removal
 needs U2NET files under `models/u2net`. The dinomaly service needs
 `models/dinomaly/best_model.pth`, and downloads its DINOv2 backbone on first
 use. Without a checkpoint the container stays up but `/health` reports
-`not_loaded`. The legacy anomaly service needs `models/anomaly/memory_bank.pth`
-on the same terms.
+`not_loaded`.
+
+The retired anomaly service still ships under the `legacy` Compose profile and
+keeps its own `ANOMALY_*` settings and `models/anomaly/` weights; see
+`docker-compose.yml` if you need it.
 
 ## Matching Benchmark
 
@@ -314,13 +307,14 @@ Current verified GPU health responses:
   "matching": {
     "status": "healthy",
     "model_loaded": true,
-    "device": "cuda"
+    "device": "cuda",
+    "storage_dir": "/app/storage/matching"
   },
-  "anomaly": {
+  "dinomaly": {
     "status": "healthy",
-    "bank_loaded": true,
-    "bank_size": 92381,
-    "threshold": 31.5798974609375,
+    "model_loaded": true,
+    "threshold": 0.192822,
+    "score_mode": "roi_topk",
     "device": "cuda"
   }
 }
@@ -360,8 +354,8 @@ http://localhost:8501/validator/
 ```
 
 Use a folder with `before/` query images and `after/` gallery images for
-matching accuracy. The page also has an anomaly batch panel for the anomaly
-service.
+matching accuracy. The page also has a Dinomaly tab that scores a zip of
+`abnormal/` and `good/` folders and reports accuracy, precision, and recall.
 
 Matching endpoints:
 
@@ -624,13 +618,14 @@ GPU 사용 중이면 응답에 `"device": "cuda"`가 포함됩니다.
   "matching": {
     "status": "healthy",
     "model_loaded": true,
-    "device": "cuda"
+    "device": "cuda",
+    "storage_dir": "/app/storage/matching"
   },
-  "anomaly": {
+  "dinomaly": {
     "status": "healthy",
-    "bank_loaded": true,
-    "bank_size": 92381,
-    "threshold": 31.5798974609375,
+    "model_loaded": true,
+    "threshold": 0.192822,
+    "score_mode": "roi_topk",
     "device": "cuda"
   }
 }
@@ -659,11 +654,8 @@ models/
 │   └── encoder.pt
 ├── u2net/
 │   └── u2net.onnx
-├── dinomaly/
-│   └── best_model.pth
-└── anomaly/            # legacy profile only
-    ├── memory_bank.pth
-    └── threshold.json
+└── dinomaly/
+    └── best_model.pth
 ```
 
 매칭 서비스는 `models/matching/encoder.pt`가 필요합니다. 전처리의 배경 제거를
