@@ -27,6 +27,11 @@ from PIL import Image
 import cv2
 from rembg import remove, new_session
 
+try:
+    import torch
+except ImportError:  # torch is optional for the CPU-only preprocessing path
+    torch = None
+
 # Global sessions for performance (reused across calls)
 _sessions = {}
 _yolo_model = None
@@ -165,27 +170,33 @@ def _odd_kernel_size(value: int, minimum: int = 3, maximum: int = 151) -> int:
 
 def _dark_tray_candidate(image_np: np.ndarray) -> np.ndarray:
     """Approximate black tray pixels while excluding the white table."""
-    max_channel = image_np.max(axis=2)
-    min_channel = image_np.min(axis=2)
-    channel_spread = max_channel - min_channel
-    luminance = (
-        0.299 * image_np[:, :, 0]
-        + 0.587 * image_np[:, :, 1]
-        + 0.114 * image_np[:, :, 2]
-    )
+    red, green, blue = image_np[:, :, 0], image_np[:, :, 1], image_np[:, :, 2]
+    max_channel = np.maximum(np.maximum(red, green), blue)
+    min_channel = np.minimum(np.minimum(red, green), blue)
 
     dark_neutral = (
         (max_channel < 125)
         & (min_channel < 110)
-        & (channel_spread < 90)
-        & (luminance < 120)
+        & ((max_channel - min_channel) < 90)
     )
+    # Luminance promotes uint8 to float64, so only evaluate it where the cheap
+    # integer tests already passed instead of over the whole image.
+    if dark_neutral.any():
+        luminance = (
+            0.299 * red[dark_neutral]
+            + 0.587 * green[dark_neutral]
+            + 0.114 * blue[dark_neutral]
+        )
+        dark_neutral[dark_neutral] = luminance < 120
+
     very_dark = max_channel < 70
     return dark_neutral | very_dark
 
 
-def _dark_tray_retention(image_np: np.ndarray, mask_np: np.ndarray) -> float | None:
-    dark = _dark_tray_candidate(image_np)
+def _dark_tray_retention(
+    image_np: np.ndarray, mask_np: np.ndarray, dark: np.ndarray | None = None
+) -> float | None:
+    dark = _dark_tray_candidate(image_np) if dark is None else dark
     dark_count = int(dark.sum())
     if dark_count < max(500, int(dark.size * 0.002)):
         return None
@@ -213,7 +224,8 @@ def preserve_dark_tray_in_mask(
     if not foreground.any():
         return mask
 
-    retention = _dark_tray_retention(image_np, mask_np)
+    dark = _dark_tray_candidate(image_np)
+    retention = _dark_tray_retention(image_np, mask_np, dark)
     if retention is None or retention >= min_dark_retention:
         return mask
 
@@ -233,7 +245,7 @@ def preserve_dark_tray_in_mask(
         max(0, left - pad_x) : min(w, right + pad_x + 1),
     ] = True
 
-    tray_pixels = (_dark_tray_candidate(image_np) & roi).astype(np.uint8) * 255
+    tray_pixels = (dark & roi).astype(np.uint8) * 255
     if not np.any(tray_pixels):
         return mask
 
@@ -293,6 +305,29 @@ def preserve_dark_tray_in_mask(
     return Image.fromarray(repaired.astype(np.uint8), mode="L")
 
 
+def _blend_to_background(
+    source_np: np.ndarray, bg: np.ndarray, alpha: np.ndarray
+) -> np.ndarray:
+    """source*alpha + bg*(1-alpha) in float32, on the GPU when there is one.
+
+    torch matches numpy here: IEEE float32 arithmetic and round-half-to-even,
+    so the bytes are the same either way.
+    """
+    if torch is not None and torch.cuda.is_available():
+        try:
+            dev = torch.device("cuda")
+            src_t = torch.from_numpy(source_np).to(dev, torch.float32)
+            bg_t = torch.from_numpy(bg).to(dev, torch.float32)
+            a_t = torch.from_numpy(alpha).to(dev, torch.float32)
+            out = (src_t * a_t + bg_t * (1.0 - a_t)).round().to(torch.uint8)
+            return out.cpu().numpy()
+        except Exception:
+            pass
+    source_float = source_np.astype(np.float32)
+    bg_float = bg.astype(np.float32)
+    return (source_float * alpha + bg_float * (1.0 - alpha)).round().astype(np.uint8)
+
+
 def apply_mask_to_rgb(
     image: Image.Image,
     mask: Image.Image,
@@ -320,7 +355,12 @@ def apply_mask_to_rgb(
     final_fg = mask_np > 10
     original_fg = rembg_mask_np > 10
     added_fg = final_fg & ~original_fg
-    added_dark_tray = added_fg & _dark_tray_candidate(original_np)
+    # _dark_tray_candidate is a full-image pass; nothing was added means nothing to classify.
+    added_dark_tray = (
+        added_fg & _dark_tray_candidate(original_np)
+        if added_fg.any()
+        else added_fg
+    )
 
     source_np = source_np.copy()
     source_np[added_dark_tray] = original_np[added_dark_tray]
@@ -330,9 +370,7 @@ def apply_mask_to_rgb(
     bg = np.full_like(source_np, background_color, dtype=np.uint8)
     source_np[added_fg & ~added_dark_tray] = bg[added_fg & ~added_dark_tray]
 
-    source_float = source_np.astype(np.float32)
-    bg_float = bg.astype(np.float32)
-    rgb = (source_float * alpha + bg_float * (1.0 - alpha)).round().astype(np.uint8)
+    rgb = _blend_to_background(source_np, bg, alpha)
     return Image.merge("RGBA", (*Image.fromarray(rgb, mode="RGB").split(), mask))
 
 
@@ -856,21 +894,45 @@ def smart_crop(image: Image.Image, padding: int = 0) -> Image.Image:
         return image.crop((left, top, right, bottom))
 
 
+# u2net + the cv2 morphology in remove_background scale with input pixels; 4 is
+# what the matching gallery was built with. Set to 1 to segment at full res.
+MATCHING_DOWNSCALE = int(os.getenv("MATCHING_DOWNSCALE", "4"))
+
+
+def _rotate_mask(mask: Image.Image, angle: float) -> Image.Image:
+    """Mask half of rotate_image_and_mask, pixel-for-pixel."""
+    if abs(angle) < 1e-3:
+        return mask
+    mask_np = np.array(mask.convert("L"))
+    h, w = mask_np.shape[:2]
+    matrix = cv2.getRotationMatrix2D((w // 2, h // 2), angle, 1.0)
+    rotated = cv2.warpAffine(
+        mask_np, matrix, (w, h),
+        flags=cv2.INTER_NEAREST, borderMode=cv2.BORDER_CONSTANT, borderValue=0,
+    )
+    return Image.fromarray(rotated.astype(np.uint8), mode="L")
+
+
+def _pick_tilt_angle(mask: Image.Image) -> float:
+    """Angle whose rotation leaves the least residual tilt.
+
+    Rotates only the mask: the probe reads nothing else, so rotating the RGBA
+    image for the losing angle is wasted work at full resolution.
+    """
+    angle = detect_top_line_tilt_angle(mask)
+    residual_pos = abs(detect_top_line_tilt_angle(_rotate_mask(mask, angle)))
+    residual_neg = abs(detect_top_line_tilt_angle(_rotate_mask(mask, -angle)))
+    return angle if residual_pos <= residual_neg else -angle
+
+
 def preprocess_for_matching_with_rgba(image: Image.Image) -> tuple[Image.Image, Image.Image]:
-    image = image.resize((max(1, image.width // 4), max(1, image.height // 4)))
+    if MATCHING_DOWNSCALE > 1:
+        image = image.resize((
+            max(1, image.width // MATCHING_DOWNSCALE),
+            max(1, image.height // MATCHING_DOWNSCALE),
+        ))
     proc_img, bg_mask = remove_background(image, return_mask=True, model_name="u2net")
-    detected_angle = detect_top_line_tilt_angle(bg_mask)
-
-    img_pos, mask_pos = rotate_image_and_mask(proc_img, bg_mask, detected_angle)
-    residual_pos = abs(detect_top_line_tilt_angle(mask_pos))
-
-    img_neg, mask_neg = rotate_image_and_mask(proc_img, bg_mask, -detected_angle)
-    residual_neg = abs(detect_top_line_tilt_angle(mask_neg))
-
-    if residual_pos <= residual_neg:
-        proc_img, bg_mask = img_pos, mask_pos
-    else:
-        proc_img, bg_mask = img_neg, mask_neg
+    proc_img, bg_mask = rotate_image_and_mask(proc_img, bg_mask, _pick_tilt_angle(bg_mask))
 
     proc_img, bg_mask = crop_image_by_mask(proc_img, bg_mask, padding=0)
     proc_img, bg_mask = crop_image_by_mask(proc_img, bg_mask, padding=0)
