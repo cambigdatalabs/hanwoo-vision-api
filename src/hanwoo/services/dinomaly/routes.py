@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import time
+from typing import Literal
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
@@ -93,3 +94,18 @@ def set_threshold(body: ThresholdRequest):
         raise HTTPException(status_code=422, detail="threshold must be > 0")
     get_dinomaly_service().set_threshold(body.threshold)
     return {"threshold": body.threshold, "updated": True}
+
+
+class ScoreModeRequest(BaseModel):
+    score_mode: Literal["full", "roi_max", "roi_topk"]
+
+
+@router.get("/score-mode")
+def get_score_mode():
+    return {"score_mode": get_dinomaly_service().score_mode}
+
+
+@router.put("/score-mode")
+def set_score_mode(body: ScoreModeRequest):
+    get_dinomaly_service().set_score_mode(body.score_mode)
+    return {"score_mode": body.score_mode, "updated": True}

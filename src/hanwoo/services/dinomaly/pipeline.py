@@ -69,12 +69,29 @@ def _erode_mask(mask: np.ndarray, boundary_erode_px: int) -> np.ndarray:
     return eroded if np.any(eroded) else mask.copy()
 
 
+# u2net and the cv2 morphology in remove_background cost scales with input pixels
+# (~600ms at 2560px), while the ROI mask is downsampled to CROP_SIZE anyway.
+SEG_MAX_SIDE = 1024
+
+
 def segment_beef_masks(image: Image.Image, boundary_erode_px: int = 7) -> tuple[np.ndarray, np.ndarray]:
+    image = image.convert("RGB")
+    scale = SEG_MAX_SIDE / max(image.size)
+    seg_input = (
+        image
+        if scale >= 1.0
+        else image.resize(
+            (round(image.width * scale), round(image.height * scale)),
+            Image.Resampling.BILINEAR,
+        )
+    )
     _, raw_mask = remove_background(
-        image.convert("RGB"),
+        seg_input,
         return_mask=True,
         refine_mask=True,
     )
+    if raw_mask.size != image.size:
+        raw_mask = raw_mask.resize(image.size, Image.Resampling.BILINEAR)
     mask_full = _binarize_mask(raw_mask)
     inner_mask = _erode_mask(mask_full, boundary_erode_px)
     return mask_full, inner_mask
@@ -333,3 +350,6 @@ class DinomalyService:
 
     def set_threshold(self, value: float) -> None:
         self.threshold = value
+
+    def set_score_mode(self, value: str) -> None:
+        self.score_mode = value
