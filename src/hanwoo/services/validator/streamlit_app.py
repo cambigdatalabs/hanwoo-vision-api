@@ -31,6 +31,10 @@ TEXT = {
         "query_folder": "Query folder",
         "api_key": "API key",
         "test_folder": "Test Folder",
+        "benchmark_hint": "Upload a ZIP with <code>test/after/&lt;date&gt;/*.jpg</code> and <code>test/before/&lt;date&gt;/*.jpg</code> structure. Each date dir is matched independently (different embedding per date).",
+        "no_date_dirs": "No date subdirectories found in {folder}/{gallery_folder} and {folder}/{query_folder}.",
+        "per_date_results": "Per-date results",
+        "date": "Date",
         "zip_hint": "Upload a ZIP containing the benchmark folders, for example <code>test/after/*.jpg</code> and <code>test/before/*.jpg</code>.",
         "choose_zip": "Choose test folder ZIP",
         "run": "Run matching validation",
@@ -64,9 +68,20 @@ TEXT = {
         "running_accuracy": "Running accuracy: {correct}/{total}",
         "rank_line": "Rank {rank}: {name}. Similarity {similarity}. Distance {distance}.",
         "matching_tab": "Matching",
-        "anomaly_tab": "Anomaly",
-        "anomaly_settings": "Anomaly /evaluate settings",
-        "anomaly_api": "Anomaly API",
+        "anomaly_tab": "PatchCore Anomaly Detection",
+        "dinomaly_tab": "Dinomaly Anomaly Detection",
+        "anomaly_settings": "PatchCore /evaluate settings",
+        "anomaly_api": "PatchCore API",
+        "dinomaly_settings": "Dinomaly /infer settings",
+        "dinomaly_api": "Dinomaly API",
+        "heatmap": "Heatmap",
+        "avg_preprocess_ms": "Avg preprocess ms",
+        "avg_infer_ms": "Avg infer ms",
+        "run_dinomaly": "Run dinomaly evaluation",
+        "missing_dinomaly_settings": "Dinomaly API is required.",
+        "no_dinomaly_folders": "Could not find test/abnormal and/or test/good folders in the ZIP. Expected structure: test/abnormal/*.jpg and test/good/*.jpg.",
+        "dinomaly_zip_hint": "Upload a ZIP containing test/abnormal/*.jpg and test/good/*.jpg folders.",
+        "dinomaly_accuracy_hint": "Uses /infer endpoint directly per image. test/abnormal expected as anomaly, test/good expected as normal.",
         "category_dirs": "Category folders",
         "category_dirs_help": "Comma-separated category folder names under the test folder. Each category needs images/ and labels/ subfolders.",
         "anomaly_zip_hint": "Upload a ZIP containing the /evaluate dataset, for example benchmark_v3/test/{category}/images, benchmark_v3/test/{category}/labels, and benchmark_v3/test/images2.",
@@ -100,6 +115,10 @@ TEXT = {
         "query_folder": "쿼리 폴더",
         "api_key": "API 키",
         "test_folder": "테스트 폴더",
+        "benchmark_hint": "ZIP 업로드. 구조: <code>test/after/&lt;날짜&gt;/*.jpg</code>, <code>test/before/&lt;날짜&gt;/*.jpg</code>. 날짜별 독립 매칭 (날짜별 다른 임베딩).",
+        "no_date_dirs": "{folder}/{gallery_folder} 및 {folder}/{query_folder}에서 날짜 하위 디렉토리를 찾지 못했습니다.",
+        "per_date_results": "날짜별 결과",
+        "date": "날짜",
         "zip_hint": "벤치마크 폴더가 들어있는 ZIP을 업로드하세요. 예: <code>test/after/*.jpg</code>, <code>test/before/*.jpg</code>",
         "choose_zip": "테스트 폴더 ZIP 선택",
         "run": "매칭 검증 실행",
@@ -133,9 +152,20 @@ TEXT = {
         "running_accuracy": "진행 중 정확도: {correct}/{total}",
         "rank_line": "순위 {rank}: {name}. 유사도 {similarity}. 거리 {distance}.",
         "matching_tab": "매칭",
-        "anomaly_tab": "이상탐지",
-        "anomaly_settings": "이상탐지 /evaluate 설정",
-        "anomaly_api": "이상탐지 API",
+        "anomaly_tab": "PatchCore 이상탐지",
+        "dinomaly_tab": "Dinomaly 이상탐지",
+        "anomaly_settings": "PatchCore /evaluate 설정",
+        "anomaly_api": "PatchCore API",
+        "dinomaly_settings": "Dinomaly /infer 설정",
+        "dinomaly_api": "Dinomaly API",
+        "heatmap": "히트맵",
+        "avg_preprocess_ms": "평균 전처리 ms",
+        "avg_infer_ms": "평균 추론 ms",
+        "run_dinomaly": "Dinomaly 평가 실행",
+        "missing_dinomaly_settings": "Dinomaly API가 필요합니다.",
+        "no_dinomaly_folders": "ZIP에서 test/abnormal 또는 test/good 폴더를 찾지 못했습니다. 구조: test/abnormal/*.jpg, test/good/*.jpg",
+        "dinomaly_zip_hint": "test/abnormal/*.jpg와 test/good/*.jpg 폴더가 있는 ZIP을 업로드하세요.",
+        "dinomaly_accuracy_hint": "/infer 엔드포인트를 이미지별로 직접 호출합니다. test/abnormal은 이상으로, test/good은 정상으로 기대합니다.",
         "category_dirs": "카테고리 폴더",
         "category_dirs_help": "테스트 폴더 아래 카테고리 폴더명을 쉼표로 입력합니다. 각 카테고리에는 images/와 labels/가 필요합니다.",
         "anomaly_zip_hint": "/evaluate 데이터셋 ZIP을 업로드하세요. 예: benchmark_v3/test/{category}/images, benchmark_v3/test/{category}/labels, benchmark_v3/test/images2",
@@ -193,10 +223,38 @@ def images_from_zip(blob: bytes, folder: str) -> list[TestImage]:
     return sorted(images, key=lambda item: item.name)
 
 
-def extract_zip(blob: bytes) -> Path:
+def images_from_dir(root: Path, folder: str) -> dict[str, list[TestImage]]:
+    root = root.resolve()
+    folder_path = root / folder
+    if not folder_path.is_dir():
+        return {}
+    date_dirs: dict[str, list[TestImage]] = {}
+    for entry in sorted(folder_path.iterdir()):
+        if not entry.is_dir():
+            continue
+        images: list[TestImage] = []
+        for f in sorted(entry.iterdir()):
+            if f.suffix.lower() not in IMAGE_EXTS:
+                continue
+            images.append(TestImage(f.name, f.read_bytes(), image_mime(f.name)))
+        if images:
+            date_dirs[entry.name] = images
+    return date_dirs
+
+
+def extract_zip(blob) -> Path:
+    """Extract an uploaded zip, streaming rather than copying it in memory.
+
+    Streamlit already holds the upload in RAM; calling .getvalue() on top of that
+    doubled it, and reading each member whole tripled the peak. A 2 GB zip used to
+    OOM the container.
+    """
+    if hasattr(blob, "seek"):
+        blob.seek(0)
+    source = blob if hasattr(blob, "read") else io.BytesIO(blob)
     target = UPLOAD_ROOT / uuid4().hex
     target.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(io.BytesIO(blob)) as archive:
+    with zipfile.ZipFile(source) as archive:
         for info in archive.infolist():
             path = PurePosixPath(info.filename)
             if info.is_dir():
@@ -205,7 +263,8 @@ def extract_zip(blob: bytes) -> Path:
                 continue
             output = target.joinpath(*path.parts)
             output.parent.mkdir(parents=True, exist_ok=True)
-            output.write_bytes(archive.read(info))
+            with archive.open(info) as src, open(output, "wb") as dst:
+                shutil.copyfileobj(src, dst)
     return target
 
 
@@ -253,6 +312,18 @@ def api_request(method: str, base_url: str, path: str, api_key: str, **kwargs):
     )
     response.raise_for_status()
     return response.json()
+
+
+SCORE_MODES = ("roi_topk", "roi_max", "full")
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def fetch_dinomaly_settings(base_url: str, api_key: str) -> tuple[str, str]:
+    try:
+        health = api_request("GET", base_url, "/health", api_key, timeout=5)
+        return str(health["threshold"]), str(health["score_mode"])
+    except Exception:
+        return "0.192822", SCORE_MODES[0]
 
 
 def upload_gallery(
@@ -416,6 +487,7 @@ def run_matching(
     correct = 0
     round_trip_ms = 0
     compute_ms = 0.0
+    preprocess_ms = 0.0
     rows: list[dict] = []
     status = st.empty()
     progress = st.progress(0, text=text["running_queries"])
@@ -432,8 +504,10 @@ def run_matching(
         )
         rt_ms = round((time.perf_counter() - t0) * 1000)
         server_ms = float(data.get("query_compute_ms") or 0.0)
+        server_preprocess_ms = float(data.get("preprocess_ms") or 0.0)
         round_trip_ms += rt_ms
         compute_ms += server_ms
+        preprocess_ms += server_preprocess_ms
 
         matches = data.get("matches", [])
         top_match = matches[0] if matches else {}
@@ -457,6 +531,7 @@ def run_matching(
                 "Top-K pairs": "\n".join(format_pair(match, text) for match in matches),
                 "round_trip_ms": rt_ms,
                 "compute_ms": round(server_ms),
+                "preprocess_ms": round(server_preprocess_ms, 1),
             }
         )
         progress.progress(
@@ -472,6 +547,7 @@ def run_matching(
         "total": total,
         "avg_round_trip_ms": round(round_trip_ms / total) if total else 0,
         "avg_compute_ms": round(compute_ms / total) if total else 0,
+        "avg_preprocess_ms": round(preprocess_ms / total, 1) if total else 0,
         "elapsed_s": round(time.perf_counter() - start, 1),
     }
     return rows, metrics
@@ -481,7 +557,7 @@ def run_anomaly(
     base_url: str,
     api_key: str,
     preprocess: bool,
-    zip_blob: bytes,
+    zip_blob,
     categories: list[str],
     text: dict[str, str],
 ) -> tuple[dict, dict]:
@@ -520,9 +596,171 @@ def run_anomaly(
         "threshold": total.get("threshold", "-"),
         "n_evaluated": n_evaluated,
         "n_skipped": result.get("n_skipped", 0),
-        "avg_total_ms": result.get("avg_total_ms", 0),
+        "avg_infer_ms": result.get("avg_infer_ms", 0),
         "avg_round_trip_ms": round((elapsed_s * 1000) / n_evaluated, 1) if n_evaluated else 0,
     }
+
+
+def _find_dinomaly_dirs(root: Path) -> tuple[Path | None, Path | None]:
+    abnormal = None
+    good = None
+    for d in root.rglob("*"):
+        if not d.is_dir():
+            continue
+        if d.name == "abnormal" and any(
+            f.is_file() and f.suffix.lower() in IMAGE_EXTS for f in d.iterdir()
+        ):
+            abnormal = d
+        if d.name == "good" and any(
+            f.is_file() and f.suffix.lower() in IMAGE_EXTS for f in d.iterdir()
+        ):
+            good = d
+    if abnormal and good:
+        for f in abnormal.iterdir():
+            if f.is_file() and f.suffix.lower() in IMAGE_EXTS:
+                return abnormal, good
+        for f in good.iterdir():
+            if f.is_file() and f.suffix.lower() in IMAGE_EXTS:
+                return abnormal, good
+    candidates = sorted(
+        p for p in root.rglob("abnormal") if p.is_dir()
+    )
+    for ab in candidates:
+        for g in sorted(root.rglob("good")):
+            if g.is_dir() and ab.parent == g.parent:
+                return ab, g
+    return None, None
+
+
+def run_dinomaly(
+    base_url: str,
+    api_key: str,
+    preprocess: bool,
+    heatmap: bool,
+    zip_blob,
+    text: dict[str, str],
+    threshold: float | None = None,
+    score_mode: str | None = None,
+) -> tuple[list[dict], dict]:
+    extracted_root = extract_zip(zip_blob)
+    test_abnormal, test_good = _find_dinomaly_dirs(extracted_root)
+    if test_abnormal is None or test_good is None:
+        shutil.rmtree(extracted_root, ignore_errors=True)
+        raise ValueError(text["no_dinomaly_folders"])
+
+    if threshold is not None:
+        api_request(
+            "PUT",
+            base_url,
+            "/threshold",
+            api_key,
+            json={"threshold": float(threshold)},
+        )
+
+    if score_mode is not None:
+        api_request(
+            "PUT",
+            base_url,
+            "/score-mode",
+            api_key,
+            json={"score_mode": score_mode},
+        )
+
+    all_images: list[tuple[Path, bool]] = []
+    for p in test_abnormal.rglob("*"):
+        if p.is_file() and p.suffix.lower() in IMAGE_EXTS:
+            all_images.append((p, True))
+    for p in test_good.rglob("*"):
+        if p.is_file() and p.suffix.lower() in IMAGE_EXTS:
+            all_images.append((p, False))
+    all_images.sort(key=lambda x: x[0].name)
+
+    status = st.empty()
+    warmup_progress = st.progress(0, text="Warming up...")
+    import random
+    warmup_set = random.sample(all_images, min(10, len(all_images)))
+    for i, (img_path, _) in enumerate(warmup_set, start=1):
+        with open(img_path, "rb") as f:
+            api_request(
+                "POST",
+                base_url,
+                f"/infer?preprocess={str(preprocess).lower()}&heatmap={str(heatmap).lower()}",
+                api_key,
+                files={"file": ("img.jpg", f, "image/jpeg")},
+            )
+        warmup_progress.progress(i / len(warmup_set))
+    warmup_progress.empty()
+
+    correct = 0
+    tp = fp = fn = tn = 0
+    sum_preprocess = 0.0
+    sum_infer = 0.0
+    rows: list[dict] = []
+    progress = st.progress(0)
+    start = time.perf_counter()
+
+    for index, (img_path, expected_abnormal) in enumerate(all_images, start=1):
+        with open(img_path, "rb") as f:
+            t0 = time.perf_counter()
+            data = api_request(
+                "POST",
+                base_url,
+                f"/infer?preprocess={str(preprocess).lower()}&heatmap={str(heatmap).lower()}",
+                api_key,
+                files={"file": (img_path.name, f, "image/jpeg")},
+            )
+            rt_ms = (time.perf_counter() - t0) * 1000
+        is_anomaly = bool(data.get("is_anomaly", False))
+        score = float(data.get("anomaly_score", 0.0))
+        pre_ms = float(data.get("preprocess_ms", 0))
+        inf_ms = float(data.get("infer_ms", 0))
+        sum_preprocess += pre_ms
+        sum_infer += inf_ms
+
+        pred_correct = is_anomaly == expected_abnormal
+        correct += int(pred_correct)
+
+        if expected_abnormal and is_anomaly:
+            tp += 1
+        elif expected_abnormal and not is_anomaly:
+            fn += 1
+        elif not expected_abnormal and is_anomaly:
+            fp += 1
+        else:
+            tn += 1
+
+        rows.append({
+            "image": img_path.name,
+            "score": round(score, 4),
+            "predicted": "anomaly" if is_anomaly else "normal",
+            "expected": "anomaly" if expected_abnormal else "normal",
+            "correct": "yes" if pred_correct else "no",
+            "preprocess_ms": round(pre_ms, 1),
+            "infer_ms": round(inf_ms, 1),
+            "total_ms": round(rt_ms, 1),
+        })
+        progress.progress(index / len(all_images))
+        status.caption(f"Evaluated {index}/{len(all_images)} — running acc: {correct}/{index}")
+
+    elapsed_s = time.perf_counter() - start
+    total = len(all_images)
+    precision = tp / (tp + fp) if tp + fp else 0.0
+    recall = tp / (tp + fn) if tp + fn else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    metrics = {
+        "accuracy": correct / total if total else 0.0,
+        "correct": correct,
+        "total": total,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        "avg_preprocess_ms": round(sum_preprocess / total, 1) if total else 0,
+        "avg_infer_ms": round(sum_infer / total, 1) if total else 0,
+        "avg_total_ms": round((sum_preprocess + sum_infer) / total, 1) if total else 0,
+        "elapsed_s": round(elapsed_s, 1),
+    }
+    shutil.rmtree(extracted_root, ignore_errors=True)
+    return rows, metrics
 
 
 st.set_page_config(page_title="Hanwoo Validator", layout="wide")
@@ -613,7 +851,9 @@ text = TEXT[language]
 st.title(text["title"])
 st.caption(text["caption"])
 
-matching_tab, anomaly_tab = st.tabs([text["matching_tab"], text["anomaly_tab"]])
+matching_tab, anomaly_tab, dinomaly_tab = st.tabs(
+    [text["matching_tab"], text["anomaly_tab"], text["dinomaly_tab"]]
+)
 
 with matching_tab:
     with st.expander(text["settings"], expanded=False):
@@ -629,8 +869,8 @@ with matching_tab:
             top_k = st.number_input(text["top_k"], min_value=1, max_value=50, value=5, step=1)
             preprocess = st.checkbox(text["preprocess"], value=True, key="matching_preprocess")
         with col3:
-            gallery_folder = st.text_input(text["gallery_folder"], value="after")
-            query_folder = st.text_input(text["query_folder"], value="before")
+            gallery_folder = st.text_input(text["gallery_folder"], value="test/after")
+            query_folder = st.text_input(text["query_folder"], value="test/before")
         api_key = st.text_input(
             text["api_key"],
             value=os.getenv("HANWOO_API_KEY", ""),
@@ -640,7 +880,7 @@ with matching_tab:
 
     st.subheader(text["test_folder"])
     st.markdown(
-        f'<div class="hint">{text["zip_hint"]}</div>',
+        f'<div class="hint">{text["benchmark_hint"]}</div>',
         unsafe_allow_html=True,
     )
     uploaded_zip = st.file_uploader(text["choose_zip"], type=["zip"], key="matching_zip")
@@ -655,35 +895,66 @@ with matching_tab:
             st.stop()
 
         try:
-            blob = uploaded_zip.getvalue()
-            gallery_images = images_from_zip(blob, gallery_folder)
-            query_images = images_from_zip(blob, query_folder)
-            gallery_stems = {PurePosixPath(item.name).stem for item in gallery_images}
-            query_images = [
-                image
-                for image in query_images
-                if PurePosixPath(image.name).stem in gallery_stems
-            ]
-            if not gallery_images or not query_images:
-                st.error(text["no_pairs"])
+            root = extract_zip(uploaded_zip)
+
+            gallery_by_date = images_from_dir(root, gallery_folder)
+            query_by_date = images_from_dir(root, query_folder)
+            common_dates = sorted(set(gallery_by_date) & set(query_by_date))
+            if not common_dates:
+                st.error(
+                    text["no_date_dirs"].format(
+                        folder=root, gallery_folder=gallery_folder, query_folder=query_folder
+                    )
+                )
                 st.stop()
 
-            rows, metrics = run_matching(
-                base_url,
-                api_key,
-                lot_id,
-                int(top_k),
-                preprocess,
-                gallery_images,
-                query_images,
-                text,
-            )
+            all_rows: list[dict] = []
+            total_correct = 0
+            total_queries = 0
+            total_round_trip_ms = 0
+            total_compute_ms = 0.0
+            per_date_metrics: list[dict] = []
+            overall_start = time.perf_counter()
+
+            for date in common_dates:
+                gallery_images = gallery_by_date[date]
+                query_images = query_by_date[date]
+                gallery_stems = {PurePosixPath(item.name).stem for item in gallery_images}
+                query_images = [
+                    image for image in query_images
+                    if PurePosixPath(image.name).stem in gallery_stems
+                ]
+                if not gallery_images or not query_images:
+                    continue
+
+                api_request("DELETE", base_url, f"/gallery/images?lot_id={lot_id}", api_key)
+                rows, metrics = run_matching(
+                    base_url, api_key, lot_id, int(top_k), preprocess,
+                    gallery_images, query_images, text,
+                )
+                for row in rows:
+                    row["date"] = date
+                all_rows.extend(rows)
+                total_correct += metrics["correct"]
+                total_queries += metrics["total"]
+                total_round_trip_ms += metrics["avg_round_trip_ms"] * metrics["total"]
+                total_compute_ms += metrics["avg_compute_ms"] * metrics["total"]
+                per_date_metrics.append({**metrics, "date": date})
+
+            overall_accuracy = total_correct / total_queries if total_queries else 0.0
+            overall_avg_rt = round(total_round_trip_ms / total_queries) if total_queries else 0
+            overall_avg_comp = round(total_compute_ms / total_queries) if total_queries else 0
+            metrics = {
+                "accuracy": overall_accuracy,
+                "correct": total_correct,
+                "total": total_queries,
+                "avg_round_trip_ms": overall_avg_rt,
+                "avg_compute_ms": overall_avg_comp,
+                "elapsed_s": round(time.perf_counter() - overall_start, 1),
+            }
         except requests.HTTPError as exc:
             detail = exc.response.text if exc.response is not None else str(exc)
             st.error(f"{text['api_error']}: {detail}")
-            st.stop()
-        except zipfile.BadZipFile:
-            st.error(text["bad_zip"])
             st.stop()
 
         st.subheader(text["average_results"])
@@ -698,12 +969,26 @@ with matching_tab:
         metric_cols[3].metric(text["avg_compute"], metrics["avg_compute_ms"])
         metric_cols[4].metric(text["elapsed"], f"{metrics['elapsed_s']}s")
 
+        st.subheader(text["per_date_results"])
+        per_date_rows = [
+            {
+                text["date"]: m["date"],
+                text["accuracy"]: f"{m['accuracy'] * 100:.2f}%",
+                text["correct"]: f"{m['correct']}/{m['total']}",
+                text["avg_round_trip"]: m["avg_round_trip_ms"],
+                text["avg_compute"]: m["avg_compute_ms"],
+                text["elapsed"]: m["elapsed_s"],
+            }
+            for m in per_date_metrics
+        ]
+        st.table(per_date_rows)
+
         st.subheader(text["results"])
         st.markdown(
             f'<div class="hint">{text["results_hint"]}</div>',
             unsafe_allow_html=True,
         )
-        render_results_table(rows, text)
+        render_results_table(all_rows, text)
 
 with anomaly_tab:
     with st.expander(text["anomaly_settings"], expanded=False):
@@ -750,7 +1035,7 @@ with anomaly_tab:
                 anomaly_base_url,
                 anomaly_api_key,
                 anomaly_preprocess,
-                anomaly_zip.getvalue(),
+                anomaly_zip,
                 categories,
                 text,
             )
@@ -779,8 +1064,143 @@ with anomaly_tab:
         metric_cols[0].metric(text["n_evaluated"], metrics["n_evaluated"])
         metric_cols[1].metric(text["n_skipped"], metrics["n_skipped"])
         metric_cols[2].metric(text["threshold"], metrics["threshold"])
-        metric_cols[3].metric(text["avg_total"], metrics["avg_total_ms"])
+        metric_cols[3].metric(text["avg_infer_ms"], metrics["avg_infer_ms"])
         metric_cols[4].metric(text["avg_round_trip"], metrics["avg_round_trip_ms"])
 
         st.subheader(text["per_category_results"])
         render_evaluate_table(result, text)
+
+with dinomaly_tab:
+    with st.expander(text["dinomaly_settings"], expanded=False):
+        col1, col2 = st.columns(2)
+        with col1:
+            dinomaly_base_url = st.text_input(
+                text["dinomaly_api"],
+                value=os.getenv("DINOMALY_API_BASE_URL", "http://dinomaly:8002"),
+                key="dinomaly_api",
+            )
+            dinomaly_api_key = st.text_input(
+                text["api_key"],
+                value=os.getenv("HANWOO_API_KEY", ""),
+                type="password",
+                key="dinomaly_api_key",
+            )
+        with col2:
+            server_threshold, server_score_mode = fetch_dinomaly_settings(
+                dinomaly_base_url, dinomaly_api_key
+            )
+            dinomaly_preprocess = st.checkbox(text["preprocess"], value=True, key="dinomaly_preprocess")
+            dinomaly_heatmap = st.checkbox(text["heatmap"], value=False, key="dinomaly_heatmap")
+            dinomaly_threshold = st.text_input(
+                "Threshold",
+                value=server_threshold,
+                key="dinomaly_threshold",
+                help="Set DINOMALY server threshold via PUT /threshold. Anomaly if score >= threshold.",
+            )
+            dinomaly_score_mode = st.selectbox(
+                "Score mode",
+                SCORE_MODES,
+                index=SCORE_MODES.index(server_score_mode) if server_score_mode in SCORE_MODES else 0,
+                key="dinomaly_score_mode",
+                help="Set DINOMALY server score mode via PUT /score-mode.",
+            )
+
+    st.subheader(text["test_folder"])
+    st.markdown(
+        f'<div class="hint">{text["dinomaly_zip_hint"]}</div>',
+        unsafe_allow_html=True,
+    )
+    dinomaly_zip = st.file_uploader(text["choose_zip"], type=["zip"], key="dinomaly_zip")
+    run_dinomaly_button = st.button(text["run_dinomaly"], type="primary", use_container_width=True)
+
+    if run_dinomaly_button:
+        if not dinomaly_zip:
+            st.error(text["upload_first"])
+            st.stop()
+        if not dinomaly_base_url:
+            st.error(text["missing_dinomaly_settings"])
+            st.stop()
+
+        try:
+            dinomaly_threshold = float(dinomaly_threshold)
+        except ValueError:
+            st.error("Threshold must be a valid number.")
+            st.stop()
+
+        try:
+            rows, metrics = run_dinomaly(
+                dinomaly_base_url,
+                dinomaly_api_key,
+                dinomaly_preprocess,
+                dinomaly_heatmap,
+                dinomaly_zip,
+                text,
+                threshold=dinomaly_threshold,
+                score_mode=dinomaly_score_mode,
+            )
+        except ValueError as exc:
+            st.error(str(exc))
+            st.stop()
+        except requests.HTTPError as exc:
+            detail = exc.response.text if exc.response is not None else str(exc)
+            st.error(f"{text['api_error']}: {detail}")
+            st.stop()
+        except zipfile.BadZipFile:
+            st.error(text["bad_zip"])
+            st.stop()
+
+        st.subheader(text["accuracy"])
+        st.markdown(
+            f'<div class="hint">{text["dinomaly_accuracy_hint"]}</div>',
+            unsafe_allow_html=True,
+        )
+        metric_cols = st.columns(6)
+        metric_cols[0].metric(text["accuracy"], f"{metrics['accuracy'] * 100:.2f}%")
+        metric_cols[1].metric(text["precision"], f"{metrics['precision'] * 100:.2f}%")
+        metric_cols[2].metric(text["recall"], f"{metrics['recall'] * 100:.2f}%")
+        metric_cols[3].metric(text["correct"], f"{metrics['correct']}/{metrics['total']}")
+        metric_cols[4].metric(text["avg_preprocess_ms"], metrics["avg_preprocess_ms"])
+        metric_cols[5].metric(text["elapsed"], f"{metrics['elapsed_s']}s")
+
+        st.subheader(text["results"])
+        rendered_rows = []
+        for row in rows:
+            rendered_rows.append(
+                "<tr>"
+                f"<td>{html.escape(str(row['image']))}</td>"
+                f"<td>{html.escape(str(row['score']))}</td>"
+                f"<td>{html.escape(str(row['predicted']))}</td>"
+                f"<td>{html.escape(str(row['expected']))}</td>"
+                f"<td class=\"{ 'ok' if row['correct'] == 'yes' else 'bad' }\">"
+                f"{html.escape(text['yes'] if row['correct'] == 'yes' else text['no'])}</td>"
+                f"<td>{html.escape(str(row['preprocess_ms']))}</td>"
+                f"<td>{html.escape(str(row['infer_ms']))}</td>"
+                f"<td>{html.escape(str(row['total_ms']))}</td>"
+                "</tr>"
+            )
+        st.markdown(
+            f"""
+            <div class="results-scroll">
+              <table class="results-table">
+                <thead>
+                  <tr>
+                    <th>{html.escape('Image')}</th>
+                    <th>{html.escape('Score')}</th>
+                    <th>{html.escape('Predicted')}</th>
+                    <th>{html.escape('Expected')}</th>
+                    <th>{html.escape(text['correct'])}</th>
+                    <th>{html.escape('Preproc ms')}</th>
+                    <th>{html.escape('Infer ms')}</th>
+                    <th>{html.escape('Total ms')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+            """
+            + "\n".join(rendered_rows)
+            + """
+                </tbody>
+              </table>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
