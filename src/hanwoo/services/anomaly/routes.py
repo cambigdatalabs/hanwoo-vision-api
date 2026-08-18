@@ -122,15 +122,20 @@ def _compute_metrics(scores: list[float], labels: list[int], threshold: float) -
     s = np.array(scores); l = np.array(labels)
     preds = (s >= threshold).astype(int)
     cm = confusion_matrix(l, preds, labels=[0,1]).tolist()
+    n_normal = int((l == 0).sum())
+    n_anomaly = int((l == 1).sum())
+    pos_label = 1
+    if n_normal > 0 and n_anomaly == 0:
+        pos_label = 0
     return {
         "accuracy":  round(float(accuracy_score(l, preds)), 4),
-        "precision": round(float(precision_score(l, preds, zero_division=0)), 4),
-        "recall":    round(float(recall_score(l, preds, zero_division=0)), 4),
-        "f1":        round(float(f1_score(l, preds, zero_division=0)), 4),
+        "precision": round(float(precision_score(l, preds, pos_label=pos_label, zero_division=0)), 4),
+        "recall":    round(float(recall_score(l, preds, pos_label=pos_label, zero_division=0)), 4),
+        "f1":        round(float(f1_score(l, preds, pos_label=pos_label, zero_division=0)), 4),
         "threshold": round(threshold, 4),
         "n_total":   len(l),
-        "n_normal":  int((l==0).sum()),
-        "n_anomaly": int((l==1).sum()),
+        "n_normal":  n_normal,
+        "n_anomaly": n_anomaly,
         "confusion_matrix": cm,
     }
 

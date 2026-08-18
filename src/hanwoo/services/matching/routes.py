@@ -206,9 +206,12 @@ async def match_image(
     capture_date: Annotated[str | None, Query()] = None,
 ):
     image = await read_image(file)
-    compute_start = perf_counter()
+    preprocess_ms = 0.0
     if preprocess:
+        preprocess_start = perf_counter()
         image, _ = preprocess_for_matching_with_rgba(image)
+        preprocess_ms = (perf_counter() - preprocess_start) * 1000.0
+    compute_start = perf_counter()
     try:
         matches = get_matching_service().find_matches(
             image,
@@ -228,6 +231,7 @@ async def match_image(
         "capture_date": capture_date,
         "top_k": min(top_k, len(matches)),
         "preprocess": preprocess,
+        "preprocess_ms": round(preprocess_ms, 1),
         "query_compute_ms": query_compute_ms,
         "matches": matches,
     }
