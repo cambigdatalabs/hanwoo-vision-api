@@ -1,12 +1,13 @@
 services:
   matching:
     build: .
+    gpus: all
     command: uvicorn hanwoo.services.matching.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8888:8000"
     environment:
       HANWOO_DEVICE: auto
-      MATCHING_MODEL_PATH: /app/models/matching/encoder_old.pt
+      MATCHING_MODEL_PATH: ${MATCHING_MODEL_PATH:-/app/models/matching/best_model.pth}
       HANWOO_STORAGE_DIR: /app/storage/matching
       U2NET_HOME: /app/models/u2net
       DEFAULT_TOP_K: 5
@@ -22,6 +23,7 @@ services:
 
   anomaly:
     build: .
+    gpus: all
     command: uvicorn hanwoo.services.anomaly.main:app --host 0.0.0.0 --port 8001
     ports:
       - "8889:8001"
@@ -38,14 +40,16 @@ services:
 
   dinomaly:
     build: .
+    gpus: all
     command: uvicorn hanwoo.services.dinomaly.main:app --host 0.0.0.0 --port 8002
     ports:
       - "8890:8002"
     environment:
       HANWOO_DEVICE: auto
       DINOMALY_MODEL_PATH: /app/models/dinomaly/best_model.pth
-      DINOMALY_THRESHOLD: 0.21
-      DINOMALY_SCORE_MODE: roi_max
+      DINOMALY_THRESHOLD: 0.192822
+      DINOMALY_SCORE_MODE: roi_topk
+      MATCHING_DOWNSCALE: ${MATCHING_DOWNSCALE:-1}
       U2NET_HOME: /app/models/u2net
       HANWOO_API_KEY: ${HANWOO_API_KEY:?Set HANWOO_API_KEY in .env}
     volumes:
@@ -58,14 +62,17 @@ services:
       --server.address=0.0.0.0
       --server.port=8501
       --server.baseUrlPath=validator
-      --server.maxUploadSize=1024
+      --server.maxUploadSize=2048
       --browser.gatherUsageStats=false
     ports:
       - "8501:8501"
     environment:
       MATCHING_API_BASE_URL: http://matching:8000
       ANOMALY_API_BASE_URL: http://anomaly:8001
+      DINOMALY_API_BASE_URL: http://dinomaly:8002
       HANWOO_API_KEY: ${HANWOO_API_KEY:?Set HANWOO_API_KEY in .env}
+    # A runaway upload should take out the validator, not the host.
+    mem_limit: 8g
     volumes:
       - ./storage:/app/storage
     depends_on:
