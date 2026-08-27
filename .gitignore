@@ -16,3 +16,5 @@ models/**/threshold.json
 .DS_Store
 *:Zone.Identifier
 benchmark_results.json
+preview_*
+test2_scores.csv

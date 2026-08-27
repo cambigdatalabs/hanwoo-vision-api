@@ -389,6 +389,151 @@ curl -X POST "http://localhost:8888/match?lot_id=LOT-001&capture_date=2026-06-22
 }
 ```
 
+## POST `/validate`
+
+Runs a whole benchmark ZIP server-side: builds the gallery from
+`<gallery_folder>/<date>/*.jpg`, then matches every image in
+`<query_folder>/<date>/*.jpg`. A query is correct when the top-1 match shares
+its filename stem. Each date folder is scored independently, so the gallery for
+`lot_id` is cleared between dates and emptied when the run ends — point it at a
+scratch lot, never a production one.
+
+The ZIP may wrap the folders in any number of parent directories. Images sitting
+directly in the gallery/query folder (no date subfolder) are treated as one group.
+
+### Params
+
+Multipart form-data plus query params.
+
+| Name | Location | Required | Type | Description |
+| --- | --- | --- | --- | --- |
+| `file` | form file | Yes | zip file | Benchmark archive. |
+| `lot_id` | query | No | string | Scratch lot for the run. Defaults to `validator-test`. Its gallery is wiped before and after. |
+| `top_k` | query | No | integer, 1-50 | Matches kept per query. Defaults to `DEFAULT_TOP_K`. |
+| `preprocess` | query | No | boolean | Defaults to `true`. |
+| `gallery_folder` | query | No | string | Defaults to `test/after`. |
+| `query_folder` | query | No | string | Defaults to `test/before`. |
+
+### Example
+
+```bash
+curl -X POST "http://localhost:8888/validate?lot_id=validator-test&top_k=5" \
+  -H "X-API-Key: $HANWOO_API_KEY" \
+  -F "file=@benchmark.zip"
+```
+
+### Response Example
+
+```json
+{
+  "filename": "benchmark.zip",
+  "lot_id": "validator-test",
+  "top_k": 5,
+  "preprocess": true,
+  "gallery_folder": "test/after",
+  "query_folder": "test/before",
+  "metrics": {
+    "accuracy": 1.0,
+    "correct": 2,
+    "total": 2,
+    "gallery_total": 2,
+    "dates": 1,
+    "avg_preprocess_ms": 22.8,
+    "avg_match_ms": 66.0,
+    "avg_total_ms": 88.7,
+    "elapsed_s": 0.6
+  },
+  "per_date": [
+    {"date": "2026-06-29", "gallery": 2, "queries": 2, "correct": 2, "accuracy": 1.0, "elapsed_s": 0.2}
+  ],
+  "results": [
+    {
+      "date": "2026-06-29",
+      "query_image": "001709.png",
+      "expected": "001709",
+      "top1": "001709",
+      "correct": true,
+      "matches": [
+        {"rank": 1, "name": "001709", "similarity": 100.0, "distance": 0.0, "matched_variant": "original"}
+      ],
+      "preprocess_ms": 22.9,
+      "match_ms": 67.5,
+      "total_ms": 90.4
+    }
+  ],
+  "system": { "...": "see GET /system" }
+}
+```
+
+## GET `/system`
+
+Reports what the process actually loaded: weight checksums, device, GPU, driver,
+and library versions. Use it to confirm two hosts are running the same thing.
+`/validate` embeds the same block under `system`.
+
+### Example
+
+```bash
+curl "http://localhost:8888/system" -H "X-API-Key: $HANWOO_API_KEY"
+```
+
+### Response Example
+
+```json
+{
+  "service": "matching",
+  "host": "d4ad16cb1b82",
+  "pid": 1,
+  "python": "3.12.3",
+  "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "hardware": {
+    "device": "cuda",
+    "device_type": "cuda",
+    "cuda_available": true,
+    "torch_version": "2.13.0+cu130",
+    "torch_cuda_version": "13.0",
+    "cudnn_version": 92000,
+    "gpu_name": "NVIDIA GeForce RTX 5070",
+    "gpu_index": 0,
+    "gpu_count": 1,
+    "gpu_capability": "12.0",
+    "gpu_total_memory_mb": 12227,
+    "gpu_memory_allocated_mb": 597,
+    "gpu_memory_reserved_mb": 1876,
+    "driver_version": "591.86",
+    "smi_gpu_name": "NVIDIA GeForce RTX 5070",
+    "smi_gpu_memory": "12227 MiB"
+  },
+  "weights": {
+    "matching": {
+      "path": "/app/models/matching/best_model.pth",
+      "exists": true,
+      "size_bytes": 1049832199,
+      "modified": "2026-08-14T04:52:54.816793+00:00",
+      "sha256": "7a78775826e8..."
+    },
+    "u2net": {"path": "/app/models/u2net/u2net.onnx", "exists": true, "size_bytes": 175997641, "modified": "2026-06-18T06:06:13.821399+00:00", "sha256": "8d10d2f3bb75..."}
+  },
+  "packages": {"torch": "2.13.0", "torchvision": "0.28.0", "timm": "1.0.28", "numpy": "2.5.2", "opencv-python-headless": "5.0.0.93", "pillow": "12.3.0", "onnxruntime-gpu": "1.28.0", "qdrant-client": "1.19.0", "fastapi": "0.141.1"},
+  "model_loaded": true,
+  "config": {
+    "architecture": "SiameseViT",
+    "gallery_dir": "/app/storage/matching/gallery_images",
+    "storage_dir": "/app/storage/matching",
+    "backbone": "swin",
+    "embedding_dim": 256,
+    "image_size": 224,
+    "epoch": 13,
+    "metrics": {"top1_acc": 1.0, "top5_acc": 1.0}
+  },
+  "qdrant": {"url": "http://qdrant:6333", "collection": "hanwoo_matching_gallery", "reachable": true, "points": 412}
+}
+```
+
+GPU fields and `driver_version` appear only when CUDA is available. A checkpoint
+that is missing reports `{"path": "...", "exists": false}`, and an unreachable
+Qdrant reports `"reachable": false` with the error.
+
 ## Error Responses
 
 Missing or invalid params usually return `422`.
@@ -624,6 +769,113 @@ curl -X PUT "http://localhost:8890/score-mode" \
 }
 ```
 
-Dinomaly has no `/evaluate`. Batch evaluation runs client-side: the validator's
-Dinomaly tab scores a zip of `abnormal/` and `good/` folders one image at a
-time through `/infer`.
+## POST `/validate`
+
+Scores a whole benchmark ZIP server-side, in-process: every image under
+`abnormal/` is expected to be an anomaly, every image under `good/` normal. The
+folders may sit at any depth in the archive. Heatmaps are never returned here —
+`heatmap=true` only makes the run pay the same cost per image.
+
+`threshold` and `score_mode` override the service settings for this run only;
+the previous values are restored when it finishes. Use `PUT /threshold` and
+`PUT /score-mode` to change them for good.
+
+### Params
+
+Multipart form-data plus query params.
+
+| Name | Location | Required | Type | Description |
+| --- | --- | --- | --- | --- |
+| `file` | form file | Yes | zip file | Archive with `abnormal/` and `good/` folders. |
+| `preprocess` | query | No | boolean | Defaults to `true`. |
+| `heatmap` | query | No | boolean | Defaults to `false`. Computes heatmaps for timing only. |
+| `warmup` | query | No | integer | Defaults to `3`. Untimed inferences run first so CUDA warm-up stays out of the averages. |
+| `threshold` | query | No | float | Overrides the threshold for this run. |
+| `score_mode` | query | No | string | One of `roi_topk`, `roi_max`, `full`. Overrides the mode for this run. |
+
+### Example
+
+```bash
+curl -X POST "http://localhost:8890/validate?preprocess=true&score_mode=roi_topk" \
+  -H "X-API-Key: $HANWOO_API_KEY" \
+  -F "file=@benchmark.zip"
+```
+
+### Response Example
+
+```json
+{
+  "filename": "benchmark.zip",
+  "preprocess": true,
+  "heatmap": false,
+  "warmup": 3,
+  "threshold": 0.192822,
+  "score_mode": "roi_topk",
+  "metrics": {
+    "accuracy": 0.955,
+    "correct": 191,
+    "precision": 0.96,
+    "recall": 0.95,
+    "f1": 0.955,
+    "specificity": 0.96,
+    "confusion": {"tp": 95, "fp": 4, "fn": 5, "tn": 96},
+    "auroc": 0.9846,
+    "total": 200,
+    "n_anomaly": 100,
+    "n_normal": 100,
+    "n_preprocess_failed": 0,
+    "avg_preprocess_ms": 23.1,
+    "avg_infer_ms": 51.4,
+    "avg_total_ms": 74.5,
+    "elapsed_s": 15.1
+  },
+  "results": [
+    {
+      "image": "001709.png",
+      "score": 0.4582,
+      "score_details": {"full_image_score": 0.7403, "roi_score": 0.6246, "roi_topk_score": 0.4582},
+      "predicted": "anomaly",
+      "expected": "anomaly",
+      "correct": true,
+      "preprocess_failed": false,
+      "preprocess_ms": 23.2,
+      "infer_ms": 51.7,
+      "total_ms": 74.9
+    }
+  ],
+  "system": { "...": "see GET /system" }
+}
+```
+
+`auroc` is present only when both classes are in the ZIP. Images whose
+preprocessing fails are still scored on the raw image and flagged with
+`preprocess_failed`.
+
+## GET `/system`
+
+Same block as the matching service's `/system`, with `weights.dinomaly`,
+`weights.u2net`, and a Dinomaly `config`:
+
+```json
+{
+  "service": "dinomaly",
+  "model_loaded": true,
+  "config": {
+    "encoder_name": "dinov2reg_vit_base_14",
+    "threshold": 0.192822,
+    "score_mode": "roi_topk",
+    "score_topk_ratio": 0.01,
+    "image_size": 448,
+    "crop_size": 392
+  }
+}
+```
+
+```bash
+curl "http://localhost:8890/system" -H "X-API-Key: $HANWOO_API_KEY"
+```
+
+Dinomaly has no `/evaluate`. Batch evaluation runs either server-side through
+`/validate`, or client-side: the validator's Dinomaly tab scores a zip of
+`abnormal/` and `good/` folders one image at a time through `/infer`.
+

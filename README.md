@@ -369,6 +369,8 @@ Matching endpoints:
 | `DELETE` | `/gallery/images/{name}` | Delete one image by name inside a lot/date scope. |
 | `DELETE` | `/gallery/images` | Clear a lot or lot/date gallery scope. |
 | `POST` | `/match` | Match one query image against a lot/date gallery scope. |
+| `POST` | `/validate` | Score a benchmark ZIP server-side and return accuracy plus per-query rows. |
+| `GET` | `/system` | Report weight checksums, device, GPU, driver, and library versions. |
 
 Dinomaly endpoints:
 
@@ -380,10 +382,13 @@ Dinomaly endpoints:
 | `PUT` | `/threshold` | Update active threshold. |
 | `GET` | `/score-mode` | Read active score mode. |
 | `PUT` | `/score-mode` | Set score mode to `roi_topk`, `roi_max`, or `full`. |
+| `POST` | `/validate` | Score a ZIP of `abnormal/` and `good/` folders server-side. |
+| `GET` | `/system` | Report weight checksums, device, GPU, driver, and library versions. |
 
 Legacy anomaly endpoints (`legacy` profile only) match the first four, plus
-`POST /evaluate` for server-side test folders. Dinomaly has no `/evaluate`; the
-validator's Dinomaly tab evaluates a zip client-side instead.
+`POST /evaluate` for server-side test folders. Dinomaly has no `/evaluate`; use
+`POST /validate` for a server-side run, or the validator's Dinomaly tab, which
+evaluates a zip client-side through `/infer`.
 
 Common parameters:
 
@@ -760,6 +765,8 @@ dinomaly: http://localhost:8890  (8889에서도 접근 가능)
 | `DELETE` | `/gallery/images/{name}` | 특정 lot/date 안의 이미지 1개를 삭제합니다. |
 | `DELETE` | `/gallery/images` | 특정 lot 또는 lot/date 갤러리를 비웁니다. |
 | `POST` | `/match` | 쿼리 이미지를 특정 lot/date 갤러리와 매칭합니다. |
+| `POST` | `/validate` | 벤치마크 ZIP을 서버에서 평가해 정확도와 쿼리별 결과를 반환합니다. |
+| `GET` | `/system` | weight 체크섬, device, GPU, 드라이버, 라이브러리 버전을 반환합니다. |
 
 dinomaly 엔드포인트:
 
@@ -771,10 +778,12 @@ dinomaly 엔드포인트:
 | `PUT` | `/threshold` | threshold를 변경합니다. |
 | `GET` | `/score-mode` | 현재 score mode를 조회합니다. |
 | `PUT` | `/score-mode` | score mode를 `roi_topk`, `roi_max`, `full` 중 하나로 설정합니다. |
+| `POST` | `/validate` | `abnormal/`, `good/` 폴더가 담긴 ZIP을 서버에서 평가합니다. |
+| `GET` | `/system` | weight 체크섬, device, GPU, 드라이버, 라이브러리 버전을 반환합니다. |
 
 기존 anomaly 엔드포인트(`legacy` profile)는 위 4개와 `POST /evaluate`를
-제공합니다. dinomaly에는 `/evaluate`가 없고, validator의 Dinomaly 탭이 zip을
-클라이언트 측에서 평가합니다.
+제공합니다. dinomaly에는 `/evaluate`가 없습니다. 서버 측 평가는 `POST /validate`를
+사용하고, validator의 Dinomaly 탭은 `/infer`로 zip을 클라이언트 측에서 평가합니다.
 
 주요 파라미터:
 
