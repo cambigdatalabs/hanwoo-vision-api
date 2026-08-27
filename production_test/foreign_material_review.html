@@ -8,10 +8,8 @@
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; padding: 24px 32px 64px; background:#f7f7f8; color:#1a1a1a; }
   @media (prefers-color-scheme: dark) { body { background:#15161a; color:#e8e8ea; } }
   h1 { font-size: 1.5rem; margin-bottom: 4px; }
-  .subtitle { color:#666; margin-top:0; margin-bottom: 8px; }
+  .subtitle { color:#666; margin-top:0; margin-bottom: 24px; }
   @media (prefers-color-scheme: dark) { .subtitle { color:#999; } }
-  .note-box { background:#fff8e1; border:1px solid #f0d878; border-radius:8px; padding:10px 14px; font-size:.85rem; color:#6b5900; margin-bottom:24px; max-width:760px; }
-  @media (prefers-color-scheme: dark) { .note-box { background:#2a2410; border-color:#5a4d1a; color:#e0c96b; } }
   .summary { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:32px; }
   .stat { background:#fff; border:1px solid #e2e2e5; border-radius:10px; padding:12px 18px; min-width:120px; }
   @media (prefers-color-scheme: dark) { .stat { background:#1f2025; border-color:#2c2d33; } }
@@ -47,6 +45,7 @@
 <body>
   <h1>이물질 탐지 결과 리뷰</h1>
   <p class="subtitle">preview_infer.xlsx 기반 · 정탐(Correct Catch) vs 오탐/미탐(Miscatch)</p>
+
   <div class="summary">
     <div class="stat"><b>6</b><span>정탐 (TP)</span></div>
     <div class="stat"><b>11</b><span>미탐 (FN, 놓침)</span></div>
@@ -61,8 +60,8 @@
       <div class="grid">
     <div class="card">
       <div class="imgs">
-        <figure><img src="preview/000000_before.jpg-260827105948.jpg" loading="lazy"><figcaption>원본</figcaption></figure>
-        <figure><img src="preview_heatmaps/000000_before-260827105948_heatmap.png" loading="lazy"><figcaption>Heatmap</figcaption></figure>
+        <figure><img src="preview/000000_before.jpg-260827105948.png" loading="lazy" alt="000000_before.jpg-260827105948.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827105948_heatmap.png" loading="lazy" alt="000000_before.jpg-260827105948.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
       </div>
       <div class="meta">
         <div class="fname">000000_before.jpg-260827105948.jpg</div>
@@ -75,8 +74,8 @@
 
     <div class="card">
       <div class="imgs">
-        <figure><img src="preview/000000_before.jpg-260827110310.jpg" loading="lazy"><figcaption>원본</figcaption></figure>
-        <figure><img src="preview_heatmaps/000000_before-260827110310_heatmap.png" loading="lazy"><figcaption>Heatmap</figcaption></figure>
+        <figure><img src="preview/000000_before.jpg-260827110310.png" loading="lazy" alt="000000_before.jpg-260827110310.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110310_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110310.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
       </div>
       <div class="meta">
         <div class="fname">000000_before.jpg-260827110310.jpg</div>
@@ -89,8 +88,8 @@
 
     <div class="card">
       <div class="imgs">
-        <figure><img src="preview/000000_before.jpg-260827110331.jpg" loading="lazy"><figcaption>원본</figcaption></figure>
-        <figure><img src="preview_heatmaps/000000_before-260827110331_heatmap.png" loading="lazy"><figcaption>Heatmap</figcaption></figure>
+        <figure><img src="preview/000000_before.jpg-260827110331.png" loading="lazy" alt="000000_before.jpg-260827110331.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110331_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110331.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
       </div>
       <div class="meta">
         <div class="fname">000000_before.jpg-260827110331.jpg</div>
@@ -103,8 +102,8 @@
 
     <div class="card">
       <div class="imgs">
-        <figure><img src="preview/000000_before.jpg-260827110747.jpg" loading="lazy"><figcaption>원본</figcaption></figure>
-        <figure><img src="preview_heatmaps/000000_before-260827110747_heatmap.png" loading="lazy"><figcaption>Heatmap</figcaption></figure>
+        <figure><img src="preview/000000_before.jpg-260827110747.png" loading="lazy" alt="000000_before.jpg-260827110747.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110747_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110747.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
       </div>
       <div class="meta">
         <div class="fname">000000_before.jpg-260827110747.jpg</div>
@@ -117,8 +116,8 @@
 
     <div class="card">
       <div class="imgs">
-        <figure><img src="preview/000000_before.jpg-260827110916.jpg" loading="lazy"><figcaption>원본</figcaption></figure>
-        <figure><img src="preview_heatmaps/000000_before-260827110916_heatmap.png" loading="lazy"><figcaption>Heatmap</figcaption></figure>
+        <figure><img src="preview/000000_before.jpg-260827110916.png" loading="lazy" alt="000000_before.jpg-260827110916.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110916_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110916.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
       </div>
       <div class="meta">
         <div class="fname">000000_before.jpg-260827110916.jpg</div>
@@ -131,8 +130,8 @@
 
     <div class="card">
       <div class="imgs">
-        <figure><img src="preview/000000_before.jpg-260827111155.jpg" loading="lazy"><figcaption>원본</figcaption></figure>
-        <figure><img src="preview_heatmaps/000000_before-260827111155_heatmap.png" loading="lazy"><figcaption>Heatmap</figcaption></figure>
+        <figure><img src="preview/000000_before.jpg-260827111155.png" loading="lazy" alt="000000_before.jpg-260827111155.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827111155_heatmap.png" loading="lazy" alt="000000_before.jpg-260827111155.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
       </div>
       <div class="meta">
         <div class="fname">000000_before.jpg-260827111155.jpg</div>
@@ -150,8 +149,8 @@
       <div class="grid">
     <div class="card">
       <div class="imgs">
-        <figure><img src="preview/000000_before.jpg-260827105932.jpg" loading="lazy"><figcaption>원본</figcaption></figure>
-        <figure><img src="preview_heatmaps/000000_before-260827105932_heatmap.png" loading="lazy"><figcaption>Heatmap</figcaption></figure>
+        <figure><img src="preview/000000_before.jpg-260827105932.png" loading="lazy" alt="000000_before.jpg-260827105932.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827105932_heatmap.png" loading="lazy" alt="000000_before.jpg-260827105932.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
       </div>
       <div class="meta">
         <div class="fname">000000_before.jpg-260827105932.jpg</div>
@@ -164,8 +163,8 @@
 
     <div class="card">
       <div class="imgs">
-        <figure><img src="preview/000000_before.jpg-260827110002.jpg" loading="lazy"><figcaption>원본</figcaption></figure>
-        <figure><img src="preview_heatmaps/000000_before-260827110002_heatmap.png" loading="lazy"><figcaption>Heatmap</figcaption></figure>
+        <figure><img src="preview/000000_before.jpg-260827110002.png" loading="lazy" alt="000000_before.jpg-260827110002.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110002_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110002.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
       </div>
       <div class="meta">
         <div class="fname">000000_before.jpg-260827110002.jpg</div>
@@ -178,8 +177,8 @@
 
     <div class="card">
       <div class="imgs">
-        <figure><img src="preview/000000_before.jpg-260827110122.jpg" loading="lazy"><figcaption>원본</figcaption></figure>
-        <figure><img src="preview_heatmaps/000000_before-260827110122_heatmap.png" loading="lazy"><figcaption>Heatmap</figcaption></figure>
+        <figure><img src="preview/000000_before.jpg-260827110122.png" loading="lazy" alt="000000_before.jpg-260827110122.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110122_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110122.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
       </div>
       <div class="meta">
         <div class="fname">000000_before.jpg-260827110122.jpg</div>
@@ -192,8 +191,8 @@
 
     <div class="card">
       <div class="imgs">
-        <figure><img src="preview/000000_before.jpg-260827110134.jpg" loading="lazy"><figcaption>원본</figcaption></figure>
-        <figure><img src="preview_heatmaps/000000_before-260827110134_heatmap.png" loading="lazy"><figcaption>Heatmap</figcaption></figure>
+        <figure><img src="preview/000000_before.jpg-260827110134.png" loading="lazy" alt="000000_before.jpg-260827110134.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110134_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110134.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
       </div>
       <div class="meta">
         <div class="fname">000000_before.jpg-260827110134.jpg</div>
@@ -206,8 +205,8 @@
 
     <div class="card">
       <div class="imgs">
-        <figure><img src="preview/000000_before.jpg-260827110147.jpg" loading="lazy"><figcaption>원본</figcaption></figure>
-        <figure><img src="preview_heatmaps/000000_before-260827110147_heatmap.png" loading="lazy"><figcaption>Heatmap</figcaption></figure>
+        <figure><img src="preview/000000_before.jpg-260827110147.png" loading="lazy" alt="000000_before.jpg-260827110147.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110147_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110147.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
       </div>
       <div class="meta">
         <div class="fname">000000_before.jpg-260827110147.jpg</div>
@@ -220,8 +219,8 @@
 
     <div class="card">
       <div class="imgs">
-        <figure><img src="preview/000000_before.jpg-260827110609.jpg" loading="lazy"><figcaption>원본</figcaption></figure>
-        <figure><img src="preview_heatmaps/000000_before-260827110609_heatmap.png" loading="lazy"><figcaption>Heatmap</figcaption></figure>
+        <figure><img src="preview/000000_before.jpg-260827110609.png" loading="lazy" alt="000000_before.jpg-260827110609.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110609_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110609.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
       </div>
       <div class="meta">
         <div class="fname">000000_before.jpg-260827110609.jpg</div>
@@ -234,8 +233,8 @@
 
     <div class="card">
       <div class="imgs">
-        <figure><img src="preview/000000_before.jpg-260827110735.jpg" loading="lazy"><figcaption>원본</figcaption></figure>
-        <figure><img src="preview_heatmaps/000000_before-260827110735_heatmap.png" loading="lazy"><figcaption>Heatmap</figcaption></figure>
+        <figure><img src="preview/000000_before.jpg-260827110735.png" loading="lazy" alt="000000_before.jpg-260827110735.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110735_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110735.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
       </div>
       <div class="meta">
         <div class="fname">000000_before.jpg-260827110735.jpg</div>
@@ -248,8 +247,8 @@
 
     <div class="card">
       <div class="imgs">
-        <figure><img src="preview/000000_before.jpg-260827110757.jpg" loading="lazy"><figcaption>원본</figcaption></figure>
-        <figure><img src="preview_heatmaps/000000_before-260827110757_heatmap.png" loading="lazy"><figcaption>Heatmap</figcaption></figure>
+        <figure><img src="preview/000000_before.jpg-260827110757.png" loading="lazy" alt="000000_before.jpg-260827110757.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110757_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110757.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
       </div>
       <div class="meta">
         <div class="fname">000000_before.jpg-260827110757.jpg</div>
@@ -262,8 +261,8 @@
 
     <div class="card">
       <div class="imgs">
-        <figure><img src="preview/000000_before.jpg-260827110928.jpg" loading="lazy"><figcaption>원본</figcaption></figure>
-        <figure><img src="preview_heatmaps/000000_before-260827110928_heatmap.png" loading="lazy"><figcaption>Heatmap</figcaption></figure>
+        <figure><img src="preview/000000_before.jpg-260827110928.png" loading="lazy" alt="000000_before.jpg-260827110928.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110928_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110928.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
       </div>
       <div class="meta">
         <div class="fname">000000_before.jpg-260827110928.jpg</div>
@@ -276,8 +275,8 @@
 
     <div class="card">
       <div class="imgs">
-        <figure><img src="preview/000000_before.jpg-260827110936.jpg" loading="lazy"><figcaption>원본</figcaption></figure>
-        <figure><img src="preview_heatmaps/000000_before-260827110936_heatmap.png" loading="lazy"><figcaption>Heatmap</figcaption></figure>
+        <figure><img src="preview/000000_before.jpg-260827110936.png" loading="lazy" alt="000000_before.jpg-260827110936.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110936_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110936.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
       </div>
       <div class="meta">
         <div class="fname">000000_before.jpg-260827110936.jpg</div>
@@ -290,8 +289,8 @@
 
     <div class="card">
       <div class="imgs">
-        <figure><img src="preview/000000_before.jpg-260827111117.jpg" loading="lazy"><figcaption>원본</figcaption></figure>
-        <figure><img src="preview_heatmaps/000000_before-260827111117_heatmap.png" loading="lazy"><figcaption>Heatmap</figcaption></figure>
+        <figure><img src="preview/000000_before.jpg-260827111117.png" loading="lazy" alt="000000_before.jpg-260827111117.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827111117_heatmap.png" loading="lazy" alt="000000_before.jpg-260827111117.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
       </div>
       <div class="meta">
         <div class="fname">000000_before.jpg-260827111117.jpg</div>
@@ -309,8 +308,8 @@
       <div class="grid">
     <div class="card">
       <div class="imgs">
-        <figure><img src="preview/000000_before.jpg-260827103016.jpg" loading="lazy"><figcaption>원본</figcaption></figure>
-        <figure><img src="preview_heatmaps/000000_before-260827103016_heatmap.png" loading="lazy"><figcaption>Heatmap</figcaption></figure>
+        <figure><img src="preview/000000_before.jpg-260827103016.png" loading="lazy" alt="000000_before.jpg-260827103016.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827103016_heatmap.png" loading="lazy" alt="000000_before.jpg-260827103016.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
       </div>
       <div class="meta">
         <div class="fname">000000_before.jpg-260827103016.jpg</div>
@@ -323,8 +322,8 @@
 
     <div class="card">
       <div class="imgs">
-        <figure><img src="preview/000000_before.jpg-260827105629.jpg" loading="lazy"><figcaption>원본</figcaption></figure>
-        <figure><img src="preview_heatmaps/000000_before-260827105629_heatmap.png" loading="lazy"><figcaption>Heatmap</figcaption></figure>
+        <figure><img src="preview/000000_before.jpg-260827105629.png" loading="lazy" alt="000000_before.jpg-260827105629.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827105629_heatmap.png" loading="lazy" alt="000000_before.jpg-260827105629.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
       </div>
       <div class="meta">
         <div class="fname">000000_before.jpg-260827105629.jpg</div>
@@ -337,8 +336,8 @@
 
     <div class="card">
       <div class="imgs">
-        <figure><img src="preview/000000_before.jpg-260827112154.jpg" loading="lazy"><figcaption>원본</figcaption></figure>
-        <figure><img src="preview_heatmaps/000000_before-260827112154_heatmap.png" loading="lazy"><figcaption>Heatmap</figcaption></figure>
+        <figure><img src="preview/000000_before.jpg-260827112154.png" loading="lazy" alt="000000_before.jpg-260827112154.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827112154_heatmap.png" loading="lazy" alt="000000_before.jpg-260827112154.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
       </div>
       <div class="meta">
         <div class="fname">000000_before.jpg-260827112154.jpg</div>
