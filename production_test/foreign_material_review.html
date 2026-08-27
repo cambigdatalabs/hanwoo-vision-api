@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>이물질 탐지 결과 - Correct Catch vs Miscatch</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; padding: 24px 32px 64px; background:#f7f7f8; color:#1a1a1a; }
+  @media (prefers-color-scheme: dark) { body { background:#15161a; color:#e8e8ea; } }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .subtitle { color:#666; margin-top:0; margin-bottom: 24px; }
+  @media (prefers-color-scheme: dark) { .subtitle { color:#999; } }
+  .summary { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:32px; }
+  .stat { background:#fff; border:1px solid #e2e2e5; border-radius:10px; padding:12px 18px; min-width:120px; }
+  @media (prefers-color-scheme: dark) { .stat { background:#1f2025; border-color:#2c2d33; } }
+  .stat b { display:block; font-size:1.4rem; }
+  .stat span { font-size:.8rem; color:#777; }
+  h2 { font-size: 1.15rem; display:flex; align-items:center; gap:10px; margin-top:40px; }
+  h2.tp { color:#1a7f37; }
+  h2.fn { color:#c0392b; }
+  h2.fp { color:#b8860b; }
+  .count { font-size:.8rem; background:#eee; border-radius:12px; padding:2px 10px; color:#555; }
+  @media (prefers-color-scheme: dark) { .count { background:#2c2d33; color:#bbb; } }
+  .desc { color:#666; margin-top:4px; font-size:.9rem; }
+  @media (prefers-color-scheme: dark) { .desc { color:#999; } }
+  .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(640px,1fr)); gap:20px; margin-top:16px; }
+  .card { background:#fff; border:1px solid #e2e2e5; border-radius:12px; overflow:hidden; }
+  @media (prefers-color-scheme: dark) { .card { background:#1f2025; border-color:#2c2d33; } }
+  .imgs { display:flex; }
+  .imgs figure { flex:1; margin:0; }
+  .imgs img { width:100%; height:480px; object-fit:contain; display:block; background:#000; cursor:zoom-in; }
+  .imgs figcaption { text-align:center; font-size:.78rem; color:#888; padding:4px 0; }
+  .meta { padding:10px 14px 14px; }
+  .fname { font-size:.75rem; color:#888; word-break:break-all; margin-bottom:6px; }
+  .row { display:flex; justify-content:space-between; font-size:.88rem; padding:2px 0; }
+  .row.small { color:#888; font-size:.75rem; justify-content:flex-start; gap:8px; }
+  .none { color:#aaa; }
+  .flag { font-size:.68rem; background:#fde3e3; color:#a12; border-radius:8px; padding:1px 6px; margin-left:6px; font-weight:normal; }
+  @media (prefers-color-scheme: dark) { .flag { background:#4a1f1f; color:#f5a3a3; } }
+  #lightbox { display:none; position:fixed; inset:0; background:rgba(0,0,0,.9); z-index:100; align-items:center; justify-content:center; cursor:zoom-out; }
+  #lightbox.open { display:flex; }
+  #lightbox img { max-width:95vw; max-height:95vh; object-fit:contain; }
+</style>
+</head>
+<body>
+  <h1>이물질 탐지 결과 리뷰</h1>
+  <p class="subtitle">preview_infer.xlsx 기반 · 정탐(Correct Catch) vs 오탐/미탐(Miscatch)</p>
+
+  <div class="summary">
+    <div class="stat"><b>6</b><span>정탐 (TP)</span></div>
+    <div class="stat"><b>11</b><span>미탐 (FN, 놓침)</span></div>
+    <div class="stat"><b>3</b><span>오탐 (FP, 헛경보)</span></div>
+    <div class="stat"><b>16</b><span>정상 정탐 (TN)</span></div>
+  </div>
+
+  
+    <section>
+      <h2 class="tp">정탐 (Correctly Caught) <span class="count">6</span></h2>
+      <p class="desc">이물질이 실제로 있었고(note 기재), 모델도 정상적으로 탐지(anomaly=True)한 경우.</p>
+      <div class="grid">
+    <div class="card">
+      <div class="imgs">
+        <figure><img src="preview/000000_before.jpg-260827105948.png" loading="lazy" alt="000000_before.jpg-260827105948.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827105948_heatmap.png" loading="lazy" alt="000000_before.jpg-260827105948.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
+      </div>
+      <div class="meta">
+        <div class="fname">000000_before.jpg-260827105948.jpg</div>
+        <div class="row"><span>이물질 종류</span><b>비닐 <span class="flag">GT=0 but note present</span></b></div>
+        <div class="row"><span>score</span><b>0.2002</b></div>
+        <div class="row"><span>threshold</span><b>0.1928</b></div>
+        <div class="row small">full=0.2264 roi=0.2264 roi_topk=0.2002 · GT col=0</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="imgs">
+        <figure><img src="preview/000000_before.jpg-260827110310.png" loading="lazy" alt="000000_before.jpg-260827110310.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110310_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110310.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
+      </div>
+      <div class="meta">
+        <div class="fname">000000_before.jpg-260827110310.jpg</div>
+        <div class="row"><span>이물질 종류</span><b>비닐</b></div>
+        <div class="row"><span>score</span><b>0.1932</b></div>
+        <div class="row"><span>threshold</span><b>0.1928</b></div>
+        <div class="row small">full=0.2106 roi=0.2106 roi_topk=0.1932 · GT col=1</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="imgs">
+        <figure><img src="preview/000000_before.jpg-260827110331.png" loading="lazy" alt="000000_before.jpg-260827110331.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110331_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110331.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
+      </div>
+      <div class="meta">
+        <div class="fname">000000_before.jpg-260827110331.jpg</div>
+        <div class="row"><span>이물질 종류</span><b>비닐</b></div>
+        <div class="row"><span>score</span><b>0.2342</b></div>
+        <div class="row"><span>threshold</span><b>0.1928</b></div>
+        <div class="row small">full=0.2525 roi=0.2525 roi_topk=0.2342 · GT col=1</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="imgs">
+        <figure><img src="preview/000000_before.jpg-260827110747.png" loading="lazy" alt="000000_before.jpg-260827110747.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110747_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110747.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
+      </div>
+      <div class="meta">
+        <div class="fname">000000_before.jpg-260827110747.jpg</div>
+        <div class="row"><span>이물질 종류</span><b>실</b></div>
+        <div class="row"><span>score</span><b>0.2304</b></div>
+        <div class="row"><span>threshold</span><b>0.1928</b></div>
+        <div class="row small">full=0.2626 roi=0.2626 roi_topk=0.2304 · GT col=1</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="imgs">
+        <figure><img src="preview/000000_before.jpg-260827110916.png" loading="lazy" alt="000000_before.jpg-260827110916.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110916_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110916.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
+      </div>
+      <div class="meta">
+        <div class="fname">000000_before.jpg-260827110916.jpg</div>
+        <div class="row"><span>이물질 종류</span><b>천</b></div>
+        <div class="row"><span>score</span><b>0.2886</b></div>
+        <div class="row"><span>threshold</span><b>0.1928</b></div>
+        <div class="row small">full=0.3061 roi=0.3061 roi_topk=0.2886 · GT col=1</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="imgs">
+        <figure><img src="preview/000000_before.jpg-260827111155.png" loading="lazy" alt="000000_before.jpg-260827111155.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827111155_heatmap.png" loading="lazy" alt="000000_before.jpg-260827111155.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
+      </div>
+      <div class="meta">
+        <div class="fname">000000_before.jpg-260827111155.jpg</div>
+        <div class="row"><span>이물질 종류</span><b>천+실</b></div>
+        <div class="row"><span>score</span><b>0.2117</b></div>
+        <div class="row"><span>threshold</span><b>0.1928</b></div>
+        <div class="row small">full=0.2395 roi=0.2369 roi_topk=0.2117 · GT col=1</div>
+      </div>
+    </div></div>
+    </section>
+  
+    <section>
+      <h2 class="fn">미탐 (Miscatch - 놓침, False Negative) <span class="count">11</span></h2>
+      <p class="desc">이물질이 실제로 있었지만(note 기재), 모델이 놓친(anomaly=False) 경우.</p>
+      <div class="grid">
+    <div class="card">
+      <div class="imgs">
+        <figure><img src="preview/000000_before.jpg-260827105932.png" loading="lazy" alt="000000_before.jpg-260827105932.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827105932_heatmap.png" loading="lazy" alt="000000_before.jpg-260827105932.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
+      </div>
+      <div class="meta">
+        <div class="fname">000000_before.jpg-260827105932.jpg</div>
+        <div class="row"><span>이물질 종류</span><b>비닐 <span class="flag">GT=0 but note present</span></b></div>
+        <div class="row"><span>score</span><b>0.1804</b></div>
+        <div class="row"><span>threshold</span><b>0.1928</b></div>
+        <div class="row small">full=0.2233 roi=0.2221 roi_topk=0.1804 · GT col=0</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="imgs">
+        <figure><img src="preview/000000_before.jpg-260827110002.png" loading="lazy" alt="000000_before.jpg-260827110002.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110002_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110002.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
+      </div>
+      <div class="meta">
+        <div class="fname">000000_before.jpg-260827110002.jpg</div>
+        <div class="row"><span>이물질 종류</span><b>비닐</b></div>
+        <div class="row"><span>score</span><b>0.1763</b></div>
+        <div class="row"><span>threshold</span><b>0.1928</b></div>
+        <div class="row small">full=0.1883 roi=0.183 roi_topk=0.1763 · GT col=1</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="imgs">
+        <figure><img src="preview/000000_before.jpg-260827110122.png" loading="lazy" alt="000000_before.jpg-260827110122.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110122_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110122.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
+      </div>
+      <div class="meta">
+        <div class="fname">000000_before.jpg-260827110122.jpg</div>
+        <div class="row"><span>이물질 종류</span><b>뼈</b></div>
+        <div class="row"><span>score</span><b>0.1808</b></div>
+        <div class="row"><span>threshold</span><b>0.1928</b></div>
+        <div class="row small">full=0.1946 roi=0.1946 roi_topk=0.1808 · GT col=1</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="imgs">
+        <figure><img src="preview/000000_before.jpg-260827110134.png" loading="lazy" alt="000000_before.jpg-260827110134.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110134_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110134.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
+      </div>
+      <div class="meta">
+        <div class="fname">000000_before.jpg-260827110134.jpg</div>
+        <div class="row"><span>이물질 종류</span><b>뼈</b></div>
+        <div class="row"><span>score</span><b>0.1746</b></div>
+        <div class="row"><span>threshold</span><b>0.1928</b></div>
+        <div class="row small">full=0.1881 roi=0.1881 roi_topk=0.1746 · GT col=1</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="imgs">
+        <figure><img src="preview/000000_before.jpg-260827110147.png" loading="lazy" alt="000000_before.jpg-260827110147.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110147_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110147.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
+      </div>
+      <div class="meta">
+        <div class="fname">000000_before.jpg-260827110147.jpg</div>
+        <div class="row"><span>이물질 종류</span><b>뼈</b></div>
+        <div class="row"><span>score</span><b>0.1889</b></div>
+        <div class="row"><span>threshold</span><b>0.1928</b></div>
+        <div class="row small">full=0.2037 roi=0.2037 roi_topk=0.1889 · GT col=1</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="imgs">
+        <figure><img src="preview/000000_before.jpg-260827110609.png" loading="lazy" alt="000000_before.jpg-260827110609.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110609_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110609.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
+      </div>
+      <div class="meta">
+        <div class="fname">000000_before.jpg-260827110609.jpg</div>
+        <div class="row"><span>이물질 종류</span><b>뼈</b></div>
+        <div class="row"><span>score</span><b>0.1905</b></div>
+        <div class="row"><span>threshold</span><b>0.1928</b></div>
+        <div class="row small">full=0.2027 roi=0.2027 roi_topk=0.1905 · GT col=1</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="imgs">
+        <figure><img src="preview/000000_before.jpg-260827110735.png" loading="lazy" alt="000000_before.jpg-260827110735.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110735_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110735.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
+      </div>
+      <div class="meta">
+        <div class="fname">000000_before.jpg-260827110735.jpg</div>
+        <div class="row"><span>이물질 종류</span><b>실 <span class="flag">GT=0 but note present</span></b></div>
+        <div class="row"><span>score</span><b>0.1628</b></div>
+        <div class="row"><span>threshold</span><b>0.1928</b></div>
+        <div class="row small">full=0.1844 roi=0.1842 roi_topk=0.1628 · GT col=0</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="imgs">
+        <figure><img src="preview/000000_before.jpg-260827110757.png" loading="lazy" alt="000000_before.jpg-260827110757.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110757_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110757.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
+      </div>
+      <div class="meta">
+        <div class="fname">000000_before.jpg-260827110757.jpg</div>
+        <div class="row"><span>이물질 종류</span><b>실</b></div>
+        <div class="row"><span>score</span><b>0.1648</b></div>
+        <div class="row"><span>threshold</span><b>0.1928</b></div>
+        <div class="row small">full=0.2065 roi=0.1765 roi_topk=0.1648 · GT col=1</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="imgs">
+        <figure><img src="preview/000000_before.jpg-260827110928.png" loading="lazy" alt="000000_before.jpg-260827110928.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110928_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110928.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
+      </div>
+      <div class="meta">
+        <div class="fname">000000_before.jpg-260827110928.jpg</div>
+        <div class="row"><span>이물질 종류</span><b>천 <span class="flag">GT=0 but note present</span></b></div>
+        <div class="row"><span>score</span><b>0.1778</b></div>
+        <div class="row"><span>threshold</span><b>0.1928</b></div>
+        <div class="row small">full=0.1963 roi=0.1963 roi_topk=0.1778 · GT col=0</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="imgs">
+        <figure><img src="preview/000000_before.jpg-260827110936.png" loading="lazy" alt="000000_before.jpg-260827110936.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827110936_heatmap.png" loading="lazy" alt="000000_before.jpg-260827110936.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
+      </div>
+      <div class="meta">
+        <div class="fname">000000_before.jpg-260827110936.jpg</div>
+        <div class="row"><span>이물질 종류</span><b>천</b></div>
+        <div class="row"><span>score</span><b>0.1768</b></div>
+        <div class="row"><span>threshold</span><b>0.1928</b></div>
+        <div class="row small">full=0.2243 roi=0.2147 roi_topk=0.1768 · GT col=1</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="imgs">
+        <figure><img src="preview/000000_before.jpg-260827111117.png" loading="lazy" alt="000000_before.jpg-260827111117.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827111117_heatmap.png" loading="lazy" alt="000000_before.jpg-260827111117.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
+      </div>
+      <div class="meta">
+        <div class="fname">000000_before.jpg-260827111117.jpg</div>
+        <div class="row"><span>이물질 종류</span><b>뼈+비닐</b></div>
+        <div class="row"><span>score</span><b>0.189</b></div>
+        <div class="row"><span>threshold</span><b>0.1928</b></div>
+        <div class="row small">full=0.22 roi=0.219 roi_topk=0.189 · GT col=1</div>
+      </div>
+    </div></div>
+    </section>
+  
+    <section>
+      <h2 class="fp">오탐 (Miscatch - 헛경보, False Positive) <span class="count">3</span></h2>
+      <p class="desc">실제로는 이물질이 없었지만(note 없음), 모델이 있다고 잘못 판단(anomaly=True)한 경우.</p>
+      <div class="grid">
+    <div class="card">
+      <div class="imgs">
+        <figure><img src="preview/000000_before.jpg-260827103016.png" loading="lazy" alt="000000_before.jpg-260827103016.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827103016_heatmap.png" loading="lazy" alt="000000_before.jpg-260827103016.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
+      </div>
+      <div class="meta">
+        <div class="fname">000000_before.jpg-260827103016.jpg</div>
+        <div class="row"><span>이물질 종류</span><b><span class="none">-</span></b></div>
+        <div class="row"><span>score</span><b>0.202</b></div>
+        <div class="row"><span>threshold</span><b>0.1928</b></div>
+        <div class="row small">full=0.2518 roi=0.2518 roi_topk=0.202 · GT col=0</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="imgs">
+        <figure><img src="preview/000000_before.jpg-260827105629.png" loading="lazy" alt="000000_before.jpg-260827105629.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827105629_heatmap.png" loading="lazy" alt="000000_before.jpg-260827105629.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
+      </div>
+      <div class="meta">
+        <div class="fname">000000_before.jpg-260827105629.jpg</div>
+        <div class="row"><span>이물질 종류</span><b><span class="none">-</span></b></div>
+        <div class="row"><span>score</span><b>0.1999</b></div>
+        <div class="row"><span>threshold</span><b>0.1928</b></div>
+        <div class="row small">full=0.2227 roi=0.2227 roi_topk=0.1999 · GT col=0</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="imgs">
+        <figure><img src="preview/000000_before.jpg-260827112154.png" loading="lazy" alt="000000_before.jpg-260827112154.jpg original"><figcaption>원본</figcaption></figure>
+        <figure><img src="preview_heatmaps/000000_before-260827112154_heatmap.png" loading="lazy" alt="000000_before.jpg-260827112154.jpg heatmap"><figcaption>Heatmap</figcaption></figure>
+      </div>
+      <div class="meta">
+        <div class="fname">000000_before.jpg-260827112154.jpg</div>
+        <div class="row"><span>이물질 종류</span><b><span class="none">-</span></b></div>
+        <div class="row"><span>score</span><b>0.1936</b></div>
+        <div class="row"><span>threshold</span><b>0.1928</b></div>
+        <div class="row small">full=0.2076 roi=0.2076 roi_topk=0.1936 · GT col=0</div>
+      </div>
+    </div></div>
+    </section>
+
+  <div id="lightbox"><img id="lightbox-img" src=""></div>
+  <script>
+    var lb = document.getElementById('lightbox');
+    var lbImg = document.getElementById('lightbox-img');
+    document.querySelectorAll('.imgs img').forEach(function(img) {
+      img.addEventListener('click', function() {
+        lbImg.src = img.src;
+        lb.classList.add('open');
+      });
+    });
+    lb.addEventListener('click', function() { lb.classList.remove('open'); });
+  </script>
+</body>
+</html>
